@@ -1,129 +1,39 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.118/build/three.module.js';
 
-import {entity} from "./entity.js";
 
+const KEYS = {87: 'forward', 65: 'left', 83: 'backward', 68: 'right', 32: 'space', 16: 'shift'};
 
-export const player_input = (() => {
+export const PickableComponent = () => ({type: 'pickable'});
 
-  class PickableComponent extends entity.Component {
-    constructor() {
-      super();
+export function BasicCharacterControllerInput({camera}) {
+  let entity;
+  const keys = {forward: false, backward: false, left: false, right: false, space: false, shift: false};
+  document.addEventListener('keydown', (e) => setKey(e, true), false);
+  document.addEventListener('keyup', (e) => setKey(e, false), false);
+  document.addEventListener('mouseup', onMouseUp, false);
+  return {type: 'input', keys, init: (e) => entity = e};
+
+  function setKey(event, down) {
+    if (event.keyCode in KEYS) {
+      keys[KEYS[event.keyCode]] = down;
     }
+  }
 
-    InitComponent() {
-    }
-  };
+  function onMouseUp(event) {
+    const rect = document.getElementById('threejs').getBoundingClientRect();
+    const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    const y = ((event.clientY - rect.top) / rect.height) * -2 + 1;
 
-  class BasicCharacterControllerInput extends entity.Component {
-    constructor(params) {
-      super();
-      this._params = params;
-      this._Init();
-    }
-  
-    _Init() {
-      this._keys = {
-        forward: false,
-        backward: false,
-        left: false,
-        right: false,
-        space: false,
-        shift: false,
-      };
-      this._raycaster = new THREE.Raycaster();
-      document.addEventListener('keydown', (e) => this._onKeyDown(e), false);
-      document.addEventListener('keyup', (e) => this._onKeyUp(e), false);
-      document.addEventListener('mouseup', (e) => this._onMouseUp(e), false);
-    }
-  
-    _onMouseUp(event) {
-      const rect = document.getElementById('threejs').getBoundingClientRect();
-      const pos = {
-        x: ((event.clientX - rect.left) / rect.width) * 2  - 1,
-        y: ((event.clientY - rect.top ) / rect.height) * -2 + 1,
-      };
+    const ray = new THREE.Ray();
+    ray.origin.setFromMatrixPosition(camera.matrixWorld);
+    ray.direction.set(x, y, 0.5).unproject(camera).sub(ray.origin).normalize();
 
-      this._raycaster.setFromCamera(pos, this._params.camera);
+    // hack
+    document.getElementById('quest-ui').style.visibility = 'hidden';
 
-      const pickables = this._parent._parent.Filter((e) => {
-        const p = e.GetComponent('PickableComponent');
-        if (!p) {
-          return false;
-        }
-        return e._mesh;
-      });
-
-      const ray = new THREE.Ray();
-      ray.origin.setFromMatrixPosition(this._params.camera.matrixWorld);
-      ray.direction.set(pos.x, pos.y, 0.5).unproject(
-          this._params.camera).sub(ray.origin).normalize();
-
-      // hack
-      document.getElementById('quest-ui').style.visibility = 'hidden';
-
-      for (let p of pickables) {
-        // GOOD ENOUGH
-        const box = new THREE.Box3().setFromObject(p._mesh);
-
-        if (ray.intersectsBox(box)) {
-          p.Broadcast({
-              topic: 'input.picked'
-          });
-          break;
-        }
-      }
-    }
-
-    _onKeyDown(event) {
-      switch (event.keyCode) {
-        case 87: // w
-          this._keys.forward = true;
-          break;
-        case 65: // a
-          this._keys.left = true;
-          break;
-        case 83: // s
-          this._keys.backward = true;
-          break;
-        case 68: // d
-          this._keys.right = true;
-          break;
-        case 32: // SPACE
-          this._keys.space = true;
-          break;
-        case 16: // SHIFT
-          this._keys.shift = true;
-          break;
-      }
-    }
-  
-    _onKeyUp(event) {
-      switch(event.keyCode) {
-        case 87: // w
-          this._keys.forward = false;
-          break;
-        case 65: // a
-          this._keys.left = false;
-          break;
-        case 83: // s
-          this._keys.backward = false;
-          break;
-        case 68: // d
-          this._keys.right = false;
-          break;
-        case 32: // SPACE
-          this._keys.space = false;
-          break;
-        case 16: // SHIFT
-          this._keys.shift = false;
-          break;
-      }
-    }
-  };
-
-  return {
-    BasicCharacterControllerInput: BasicCharacterControllerInput,
-    PickableComponent: PickableComponent,
-  };
-
-})();
+    // GOOD ENOUGH
+    entity.parent.filter((e) => e.getComponent('pickable') && e.mesh)
+        .find((p) => ray.intersectsBox(new THREE.Box3().setFromObject(p.mesh)))
+        ?.broadcast({topic: 'input.picked'});
+  }
+}

@@ -1,64 +1,40 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.118.1/build/three.module.js';
 
-import {particle_system} from "./particle-system.js";
-import {entity} from "./entity.js";
+import {ParticleSystem} from './particle-system.js';
+import {Entity} from './entity.js';
 
-export const level_up_component = (() => {
 
-  class LevelUpComponentSpawner extends entity.Component {
-    constructor(params) {
-      super();
-      this._params = params;
-    }
+export function LevelUpComponentSpawner(params) {
+  let entity;
+  return {type: 'spawner', init: (e) => entity = e, spawn};
 
-    Spawn(pos) {
-      const e = new entity.Entity();
-      e.SetPosition(pos);
-      e.AddComponent(new LevelUpComponent(this._params));
-      this._parent._parent.Add(e);
+  function spawn(pos) {
+    const e = Entity();
+    e.setPosition(pos);
+    e.addComponent(LevelUpComponent(params));
+    entity.parent.add(e);
+    return e;
+  }
+}
 
-      return e;
-    }
-  };
+export function LevelUpComponent({camera, scene}) {
+  let entity;
+  const particles = ParticleSystem({camera, parent: scene, texture: './resources/textures/ball.png'});
+  [[0, 0], [0.1, 1], [0.7, 1], [1, 0]].forEach(p => particles.alphaSpline.addPoint(...p));
+  [[0, 0x00FF00], [0.5, 0x40C040], [1, 0xFF4040]].forEach(
+      ([t, c]) => particles.colourSpline.addPoint(t, new THREE.Color(c)));
+  [[0, 0.05], [0.5, 0.25], [1, 0]].forEach(p => particles.sizeSpline.addPoint(...p));
+  return {type: 'levelUp', init, update};
 
-  class LevelUpComponent extends entity.Component {
-    constructor(params) {
-      super();
-      this._params = params;
+  function init(e) {
+    entity = e;
+    particles.addParticles(e.position, 300);
+  }
 
-      this._particles = new particle_system.ParticleSystem({
-          camera: params.camera,
-          parent: params.scene,
-          texture: './resources/textures/ball.png',
-      });
-      this._particles._alphaSpline.AddPoint(0.0, 0.0);
-      this._particles._alphaSpline.AddPoint(0.1, 1.0);
-      this._particles._alphaSpline.AddPoint(0.7, 1.0);
-      this._particles._alphaSpline.AddPoint(1.0, 0.0);
-      
-      this._particles._colourSpline.AddPoint(0.0, new THREE.Color(0x00FF00));
-      this._particles._colourSpline.AddPoint(0.5, new THREE.Color(0x40C040));
-      this._particles._colourSpline.AddPoint(1.0, new THREE.Color(0xFF4040));
-      
-      this._particles._sizeSpline.AddPoint(0.0, 0.05);
-      this._particles._sizeSpline.AddPoint(0.5, 0.25);
-      this._particles._sizeSpline.AddPoint(1.0, 0.0);
-    }
-
-    InitComponent() {
-      this._particles.AddParticles(this._parent._position, 300);
-    }
-   
-    Update(timeElapsed) {
-      this._particles.Step(timeElapsed);
-      if (this._particles._particles.length == 0) {
-        this._parent.SetActive(false);
-      }
+  function update(timeElapsed) {
+    particles.step(timeElapsed);
+    if (particles.isEmpty()) {
+      entity.setActive(false);
     }
   }
-  
-  return {
-      LevelUpComponent: LevelUpComponent,
-      LevelUpComponentSpawner: LevelUpComponentSpawner,
-  };
-})();
+}

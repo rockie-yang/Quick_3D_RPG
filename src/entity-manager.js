@@ -1,58 +1,31 @@
+export function EntityManager() {
+  let ids = 0;
+  const entitiesMap = {};
+  const entities = [];
+  const manager = {
+    get: (name) => entitiesMap[name],
+    filter: (cb) => entities.filter(cb),
+    add, setActive, update,
+  };
+  return manager;
 
+  function add(e, name = '__name__' + ++ids) {
+    entitiesMap[name] = e;
+    entities.push(e);
+    e.parent = manager;
+    e.name = name;
+  }
 
-export const entity_manager = (() => {
-
-  class EntityManager {
-    constructor() {
-      this._ids = 0;
-      this._entitiesMap = {};
-      this._entities = [];
-    }
-
-    _GenerateName() {
-      this._ids += 1;
-
-      return '__name__' + this._ids;
-    }
-
-    Get(n) {
-      return this._entitiesMap[n];
-    }
-
-    Filter(cb) {
-      return this._entities.filter(cb);
-    }
-
-    Add(e, n) {
-      if (!n) {
-        n = this._GenerateName();
-      }
-
-      this._entitiesMap[n] = e;
-      this._entities.push(e);
-
-      e.SetParent(this);
-      e.SetName(n);
-    }
-
-    SetActive(e, b) {
-      const i = this._entities.indexOf(e);
-      if (i < 0) {
-        return;
-      }
-
-      this._entities.splice(i, 1);
-    }
-
-    Update(timeElapsed) {
-      for (let e of this._entities) {
-        e.Update(timeElapsed);
-      }
+  function setActive(e, b) {
+    const i = entities.indexOf(e);
+    if (i >= 0) {
+      entities.splice(i, 1);
     }
   }
 
-  return {
-    EntityManager: EntityManager
-  };
-
-})();
+  function update(timeElapsed) {
+    for (const e of entities) {
+      e.update(timeElapsed);
+    }
+  }
+}

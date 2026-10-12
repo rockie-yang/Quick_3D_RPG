@@ -1,129 +1,55 @@
-import {entity} from './entity.js';
+export function InventoryController() {
+  let entity;
+  const slots = {};
+  for (let i = 1; i <= 24; ++i) {
+    slots['inventory-' + i] = {type: 'inventory', value: null};
+  }
+  for (let i = 1; i <= 8; ++i) {
+    slots['inventory-equip-' + i] = {type: 'equip', value: null};
+  }
+  return {type: 'inventory', init, getItemByName};
 
-
-export const inventory_controller = (() => {
-
-  class InventoryController extends entity.Component {
-    constructor(params) {
-      super();
-
-      this._inventory = {};
-      for (let i = 1; i <= 24; ++i) {
-        this._inventory['inventory-' + i] = {
-          type: 'inventory',
-          value: null,
-        };
-      }
-
-      for (let i = 1; i <= 8; ++i) {
-        this._inventory['inventory-equip-' + i] = {
-          type: 'equip',
-          value: null,
-        };
-      }
+  function init(e) {
+    entity = e;
+    e.on('inventory.add', onInventoryAdded);
+    for (const id in slots) {
+      const element = document.getElementById(id);
+      element.ondragstart = (ev) => ev.dataTransfer.setData('text/plain', id);
+      element.ondragover = (ev) => ev.preventDefault();
+      element.ondrop = (ev) => {
+        ev.preventDefault();
+        onItemDropped(ev.dataTransfer.getData('text/plain'), id);
+      };
     }
+  }
 
-    InitComponent() {
-      this._RegisterHandler('inventory.add', (m) => this._OnInventoryAdded(m));
-
-      const _SetupElement = (n) => {
-        const element = document.getElementById(n);
-        element.ondragstart = (ev) => {
-          ev.dataTransfer.setData('text/plain', n);
-        };
-        element.ondragover = (ev) => {
-          ev.preventDefault();
-        };
-        element.ondrop = (ev) => {
-          ev.preventDefault();
-          const data = ev.dataTransfer.getData('text/plain');
-          const other = document.getElementById(data);
-    
-          this._OnItemDropped(other, element);
-        };
-      }
-
-      for (let k in this._inventory) {
-        _SetupElement(k);
-      }
+  function onItemDropped(oldId, newId) {
+    const oldValue = slots[oldId].value;
+    setItemAtSlot(oldId, slots[newId].value);
+    setItemAtSlot(newId, oldValue);
+    if (slots[newId].type == 'equip') {
+      entity.broadcast({topic: 'inventory.equip', value: oldValue, added: false});
     }
+  }
 
-    _OnItemDropped(oldElement, newElement) {
-      const oldItem = this._inventory[oldElement.id];
-      const newItem = this._inventory[newElement.id];
+  function setItemAtSlot(slot, itemName) {
+    const item = entity.findEntity(itemName)?.getComponent('item');
+    document.getElementById(slot).style.backgroundImage =
+        item ? `url('./resources/icons/weapons/${item.params.renderParams.icon}')` : '';
+    slots[slot].value = itemName;
+  }
 
-      const oldValue = oldItem.value;
-      const newValue = newItem.value;
-
-      this._SetItemAtSlot(oldElement.id, newValue);
-      this._SetItemAtSlot(newElement.id, oldValue);
-
-      if (newItem.type == 'equip') {
-        this.Broadcast({
-          topic: 'inventory.equip',
-          value: oldValue,
-          added: false,
-        });
-      }
+  function onInventoryAdded(msg) {
+    const slot = Object.keys(slots).find(k => !slots[k].value && slots[k].type == 'inventory');
+    if (slot) {
+      msg.added = true;
+      setItemAtSlot(slot, msg.value);
     }
+  }
 
-    _SetItemAtSlot(slot, itemName) {
-      const div = document.getElementById(slot);
-      const obj = this.FindEntity(itemName);
-      if (obj) {
-        const item = obj.GetComponent('InventoryItem');
-        const path = './resources/icons/weapons/' + item.RenderParams.icon;
-        div.style.backgroundImage = "url('" + path + "')";
-      } else {
-        div.style.backgroundImage = '';
-      }
-      this._inventory[slot].value = itemName;
-    }
+  function getItemByName(name) {
+    return Object.values(slots).some(s => s.value == name) ? entity.findEntity(name) : null;
+  }
+}
 
-    _OnInventoryAdded(msg) {
-      for (let k in this._inventory) {
-        if (!this._inventory[k].value && this._inventory[k].type == 'inventory') {
-          this._inventory[k].value = msg.value;
-          msg.added = true;
-
-          this._SetItemAtSlot(k, msg.value);
-  
-          break;
-        }
-      }
-    }
-
-    GetItemByName(name) {
-      for (let k in this._inventory) {
-        if (this._inventory[k].value == name) {
-          return this.FindEntity(name);
-        }
-      }
-      return null;
-    }
-  };
-
-
-  class InventoryItem extends entity.Component {
-    constructor(params) {
-      super();
-      this._params = params;
-    }
-
-    InitComponent() {}
-
-    get Params() {
-      return this._params;
-    }
-
-    get RenderParams() {
-      return this._params.renderParams;
-    }
-  };
-
-  
-  return {
-      InventoryController: InventoryController,
-      InventoryItem: InventoryItem,
-  };
-})();
+export const InventoryItem = (params) => ({type: 'item', params});

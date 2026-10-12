@@ -1,106 +1,48 @@
-import {entity} from "./entity.js";
+export function HealthComponent(params) {
+  let entity, health = params.health;
+  return {type: 'health', params, init, isAlive: () => health > 0};
 
+  function init(e) {
+    entity = e;
+    e.on('health.damage', onDamage);
+    e.on('health.add-experience', onAddExperience);
+    updateUI();
+  }
 
-export const health_component = (() => {
-
-  class HealthComponent extends entity.Component {
-    constructor(params) {
-      super();
-      this._health = params.health;
-      this._maxHealth = params.maxHealth;
-      this._params = params;
+  function updateUI() {
+    if (!params.updateUI) {
+      return;
     }
-
-    InitComponent() {
-      this._RegisterHandler('health.damage', (m) => this._OnDamage(m));
-      this._RegisterHandler('health.add-experience', (m) => this._OnAddExperience(m));
-
-      this._UpdateUI();
+    document.getElementById('health-bar').style.width = Math.floor(200 * health / params.maxHealth) + 'px';
+    for (const stat of ['strength', 'wisdomness', 'benchpress', 'curl', 'experience']) {
+      document.getElementById('stats-' + stat).innerText = params[stat];
     }
+  }
 
-    IsAlive() {
-      return this._health > 0;
+  function onAddExperience({value}) {
+    params.experience += value;
+    // Blah just something easy
+    if (params.experience < Math.round(2 ** (params.level - 1) * 100)) {
+      return;
     }
+    params.level += 1;
+    params.strength += 1;
+    params.wisdomness += 1;
+    params.benchpress += 1;
+    params.curl += 2;
 
-    _UpdateUI() {
-      if (!this._params.updateUI) {
-        return;
-      }
+    entity.findEntity('level-up-spawner').getComponent('spawner').spawn(entity.position);
+    entity.broadcast({topic: 'health.levelGained', value: params.level});
+    updateUI();
+  }
 
-      const bar = document.getElementById('health-bar');
-
-      const healthAsPercentage = this._health / this._maxHealth;
-      bar.style.width = Math.floor(200 * healthAsPercentage) + 'px';
-
-      document.getElementById('stats-strength').innerText = this._params.strength;
-      document.getElementById('stats-wisdomness').innerText = this._params.wisdomness;
-      document.getElementById('stats-benchpress').innerText = this._params.benchpress;
-      document.getElementById('stats-curl').innerText = this._params.curl;
-      document.getElementById('stats-experience').innerText = this._params.experience;
+  function onDamage({value, attacker}) {
+    health = Math.max(0.0, health - value);
+    if (health == 0) {
+      attacker?.broadcast({topic: 'health.add-experience', value: params.level * 100});
+      entity.broadcast({topic: 'health.death'});
     }
-
-    _ComputeLevelXPRequirement() {
-      const level = this._params.level;
-      // Blah just something easy
-      const xpRequired = Math.round(2 ** (level - 1) * 100);
-      return xpRequired;
-    }
-
-    _OnAddExperience(msg) {
-      this._params.experience += msg.value;
-      const requiredExperience = this._ComputeLevelXPRequirement();
-      if (this._params.experience < requiredExperience) {
-        return;
-      }
-
-      this._params.level += 1;
-      this._params.strength += 1;
-      this._params.wisdomness += 1;
-      this._params.benchpress += 1;
-      this._params.curl += 2;
-
-      const spawner = this.FindEntity(
-          'level-up-spawner').GetComponent('LevelUpComponentSpawner');
-      spawner.Spawn(this._parent._position);
-
-      this.Broadcast({
-          topic: 'health.levelGained',
-          value: this._params.level,
-      });
-
-      this._UpdateUI();
-    }
-
-    _OnDeath(attacker) {
-      if (attacker) {
-        attacker.Broadcast({
-            topic: 'health.add-experience',
-            value: this._params.level * 100
-        });
-      }
-      this.Broadcast({
-          topic: 'health.death',
-      });
-    }
-
-    _OnDamage(msg) {
-      this._health = Math.max(0.0, this._health - msg.value);
-      if (this._health == 0) {
-        this._OnDeath(msg.attacker);
-      }
-
-      this.Broadcast({
-        topic: 'health.update',
-        health: this._health,
-        maxHealth: this._maxHealth,
-      });
-
-      this._UpdateUI();
-    }
-  };
-
-  return {
-    HealthComponent: HealthComponent,
-  };
-
-})();
+    entity.broadcast({topic: 'health.update', health, maxHealth: params.maxHealth});
+    updateUI();
+  }
+}

@@ -1,160 +1,88 @@
-import {math} from './math.js';
+import {sat} from './math.js';
 
 
-export const spatial_hash_grid = (() => {
+export function SpatialHashGrid(bounds, dimensions) {
+  const [dx, dy] = dimensions;
+  const cells = [...Array(dx)].map(() => Array(dy).fill(null));
+  let queryIds = 0;
+  return {newClient, updateClient, findNear, remove};
 
-  class SpatialHashGrid {
-    constructor(bounds, dimensions) {
-      const [x, y] = dimensions;
-      this._cells = [...Array(x)].map(_ => [...Array(y)].map(_ => (null)));
-      this._dimensions = dimensions;
-      this._bounds = bounds;
-      this._queryIds = 0;
-    }
-  
-    _GetCellIndex(position) {
-      const x = math.sat((position[0] - this._bounds[0][0]) / (
-          this._bounds[1][0] - this._bounds[0][0]));
-      const y = math.sat((position[1] - this._bounds[0][1]) / (
-          this._bounds[1][1] - this._bounds[0][1]));
-  
-      const xIndex = Math.floor(x * (this._dimensions[0] - 1));
-      const yIndex = Math.floor(y * (this._dimensions[1] - 1));
-  
-      return [xIndex, yIndex];
-    }
-  
-    NewClient(position, dimensions) {
-      const client = {
-        position: position,
-        dimensions: dimensions,
-        _cells: {
-          min: null,
-          max: null,
-          nodes: null,
-        },
-        _queryId: -1,
-      };
-  
-      this._Insert(client);
-  
-      return client;
-    }
-  
-    UpdateClient(client) {
-      const [x, y] = client.position;
-      const [w, h] = client.dimensions;
-  
-      const i1 = this._GetCellIndex([x - w / 2, y - h / 2]);
-      const i2 = this._GetCellIndex([x + w / 2, y + h / 2]);
-  
-      if (client._cells.min[0] == i1[0] &&
-          client._cells.min[1] == i1[1] &&
-          client._cells.max[0] == i2[0] &&
-          client._cells.max[1] == i2[1]) {
-        return;
-      }
-  
-      this.Remove(client);
-      this._Insert(client);
-    }
-  
-    FindNear(position, bounds) {
-      const [x, y] = position;
-      const [w, h] = bounds;
-  
-      const i1 = this._GetCellIndex([x - w / 2, y - h / 2]);
-      const i2 = this._GetCellIndex([x + w / 2, y + h / 2]);
-  
-      const clients = [];
-      const queryId = this._queryIds++;
-  
-      for (let x = i1[0], xn = i2[0]; x <= xn; ++x) {
-        for (let y = i1[1], yn = i2[1]; y <= yn; ++y) {
-          let head = this._cells[x][y];
-  
-          while (head) {
-            const v = head.client;
-            head = head.next;
-  
-            if (v._queryId != queryId) {
-              v._queryId = queryId;
-              clients.push(v);
-            }
-          }
-        }
-      }
-      return clients;
-    }
-  
-    _Insert(client) {
-      const [x, y] = client.position;
-      const [w, h] = client.dimensions;
-  
-      const i1 = this._GetCellIndex([x - w / 2, y - h / 2]);
-      const i2 = this._GetCellIndex([x + w / 2, y + h / 2]);
-  
-      const nodes = [];
-  
-      for (let x = i1[0], xn = i2[0]; x <= xn; ++x) {
-        nodes.push([]);
-  
-        for (let y = i1[1], yn = i2[1]; y <= yn; ++y) {
-          const xi = x - i1[0];
-  
-          const head = {
-            next: null,
-            prev: null,
-            client: client,
-          };
-  
-          nodes[xi].push(head);
-  
-          head.next = this._cells[x][y];
-          if (this._cells[x][y]) {
-            this._cells[x][y].prev = head;
-          }
-  
-          this._cells[x][y] = head;
-        }
-      }
-  
-      client._cells.min = i1;
-      client._cells.max = i2;
-      client._cells.nodes = nodes;
-    }
-  
-    Remove(client) {
-      const i1 = client._cells.min;
-      const i2 = client._cells.max;
-  
-      for (let x = i1[0], xn = i2[0]; x <= xn; ++x) {
-        for (let y = i1[1], yn = i2[1]; y <= yn; ++y) {
-          const xi = x - i1[0];
-          const yi = y - i1[1];
-          const node = client._cells.nodes[xi][yi];
-  
-          if (node.next) {
-            node.next.prev = node.prev;
-          }
-          if (node.prev) {
-            node.prev.next = node.next;
-          }
-  
-          if (!node.prev) {
-            this._cells[x][y] = node.next;
-          }
-        }
-      }
-  
-      client._cells.min = null;
-      client._cells.max = null;
-      client._cells.nodes = null;
-    }
+  function cellIndex([x, y]) {
+    return [
+      Math.floor(sat((x - bounds[0][0]) / (bounds[1][0] - bounds[0][0])) * (dx - 1)),
+      Math.floor(sat((y - bounds[0][1]) / (bounds[1][1] - bounds[0][1])) * (dy - 1)),
+    ];
   }
 
-  return {
-    SpatialHashGrid: SpatialHashGrid,
-  };
+  function cellRange([x, y], [w, h]) {
+    return [cellIndex([x - w / 2, y - h / 2]), cellIndex([x + w / 2, y + h / 2])];
+  }
 
-})();
+  function newClient(position, dimensions) {
+    const client = {position, dimensions, cells: {min: null, max: null, nodes: null}, queryId: -1};
+    insert(client);
+    return client;
+  }
+
+  function updateClient(client) {
+    const [i1, i2] = cellRange(client.position, client.dimensions);
+    const {min, max} = client.cells;
+    if (min[0] == i1[0] && min[1] == i1[1] && max[0] == i2[0] && max[1] == i2[1]) {
+      return;
+    }
+    remove(client);
+    insert(client);
+  }
+
+  function findNear(position, size) {
+    const [i1, i2] = cellRange(position, size);
+    const clients = [];
+    const queryId = queryIds++;
+    for (let x = i1[0]; x <= i2[0]; ++x) {
+      for (let y = i1[1]; y <= i2[1]; ++y) {
+        for (let head = cells[x][y]; head; head = head.next) {
+          if (head.client.queryId != queryId) {
+            head.client.queryId = queryId;
+            clients.push(head.client);
+          }
+        }
+      }
+    }
+    return clients;
+  }
+
+  function insert(client) {
+    const [i1, i2] = cellRange(client.position, client.dimensions);
+    const nodes = [];
+    for (let x = i1[0]; x <= i2[0]; ++x) {
+      nodes.push([]);
+      for (let y = i1[1]; y <= i2[1]; ++y) {
+        const head = {next: cells[x][y], prev: null, client};
+        if (cells[x][y]) {
+          cells[x][y].prev = head;
+        }
+        cells[x][y] = head;
+        nodes[x - i1[0]].push(head);
+      }
+    }
+    client.cells = {min: i1, max: i2, nodes};
+  }
+
+  function remove(client) {
+    const {min: i1, max: i2, nodes} = client.cells;
+    for (let x = i1[0]; x <= i2[0]; ++x) {
+      for (let y = i1[1]; y <= i2[1]; ++y) {
+        const node = nodes[x - i1[0]][y - i1[1]];
+        if (node.next) {
+          node.next.prev = node.prev;
+        }
+        if (node.prev) {
+          node.prev.next = node.next;
+        } else {
+          cells[x][y] = node.next;
+        }
+      }
+    }
+    client.cells = {min: null, max: null, nodes: null};
+  }
+}

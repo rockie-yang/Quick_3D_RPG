@@ -1,95 +1,50 @@
-import {entity} from './entity.js';
-
-
-export const ui_controller = (() => {
-
-  class UIController extends entity.Component {
-    constructor(params) {
-      super();
-      this._params = params;
-      this._quests = {};
-    }
-  
-    InitComponent() {
-      this._iconBar = {
-        stats: document.getElementById('icon-bar-stats'),
-        inventory: document.getElementById('icon-bar-inventory'),
-        quests: document.getElementById('icon-bar-quests'),
-      };
-
-      this._ui = {
-        inventory: document.getElementById('inventory'),
-        stats: document.getElementById('stats'),
-        quests: document.getElementById('quest-journal'),
-      };
-
-      this._iconBar.inventory.onclick = (m) => { this._OnInventoryClicked(m); };
-      this._iconBar.stats.onclick = (m) => { this._OnStatsClicked(m); };
-      this._iconBar.quests.onclick = (m) => { this._OnQuestsClicked(m); };
-      this._HideUI();
-    }
-
-    AddQuest(quest) {
-      if (quest.id in this._quests) {
-        return;
-      }
-
-      const e = document.createElement('DIV');
-      e.className = 'quest-entry';
-      e.id = 'quest-entry-' + quest.id;
-      e.innerText = quest.title;
-      e.onclick = (evt) => {
-        this._OnQuestSelected(e.id);
-      };
-      document.getElementById('quest-journal').appendChild(e);
-
-      this._quests[quest.id] = quest;
-      this._OnQuestSelected(quest.id);
-    }
-
-    _OnQuestSelected(id) {
-      const quest = this._quests[id];
-
-      const e = document.getElementById('quest-ui');
-      e.style.visibility = '';
-
-      const text = document.getElementById('quest-text');
-      text.innerText = quest.text;
-
-      const title = document.getElementById('quest-text-title');
-      title.innerText = quest.title;
-    }
-
-    _HideUI() {
-      this._ui.inventory.style.visibility = 'hidden';
-      this._ui.stats.style.visibility = 'hidden';
-      this._ui.quests.style.visibility = 'hidden';
-    }
-    
-    _OnQuestsClicked(msg) {
-      const visibility = this._ui.quests.style.visibility;
-      this._HideUI();
-      this._ui.quests.style.visibility = (visibility ? '' : 'hidden');
-    }
-
-    _OnStatsClicked(msg) {
-      const visibility = this._ui.stats.style.visibility;
-      this._HideUI();
-      this._ui.stats.style.visibility = (visibility ? '' : 'hidden');
-    }
-
-    _OnInventoryClicked(msg) {
-      const visibility = this._ui.inventory.style.visibility;
-      this._HideUI();
-      this._ui.inventory.style.visibility = (visibility ? '' : 'hidden');
-    }
-
-    Update(timeInSeconds) {
-    }
+export function UIController() {
+  const quests = {};
+  const panels = {
+    inventory: document.getElementById('inventory'),
+    stats: document.getElementById('stats'),
+    quests: document.getElementById('quest-journal'),
   };
+  return {type: 'ui', init, addQuest};
 
-  return {
-    UIController: UIController,
-  };
+  function init() {
+    for (const name in panels) {
+      document.getElementById('icon-bar-' + name).onclick = () => toggle(name);
+    }
+    hideUI();
+  }
 
-})();
+  function addQuest(quest) {
+    if (quest.id in quests) {
+      return;
+    }
+    const e = document.createElement('DIV');
+    e.className = 'quest-entry';
+    e.id = 'quest-entry-' + quest.id;
+    e.innerText = quest.title;
+    e.onclick = () => onQuestSelected(e.id);
+    panels.quests.appendChild(e);
+
+    quests[quest.id] = quest;
+    onQuestSelected(quest.id);
+  }
+
+  function onQuestSelected(id) {
+    const quest = quests[id];
+    document.getElementById('quest-ui').style.visibility = '';
+    document.getElementById('quest-text').innerText = quest.text;
+    document.getElementById('quest-text-title').innerText = quest.title;
+  }
+
+  function hideUI() {
+    for (const p of Object.values(panels)) {
+      p.style.visibility = 'hidden';
+    }
+  }
+
+  function toggle(name) {
+    const visibility = panels[name].style.visibility;
+    hideUI();
+    panels[name].style.visibility = visibility ? '' : 'hidden';
+  }
+}

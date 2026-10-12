@@ -1,42 +1,20 @@
+export function FiniteStateMachine(states, animations) {
+  const fsm = {current: null, animations, setState, update};
+  return fsm;
 
-
-export const finite_state_machine = (() => {
-
-  class FiniteStateMachine {
-    constructor() {
-      this._states = {};
-      this._currentState = null;
-    }
-
-    _AddState(name, type) {
-      this._states[name] = type;
-    }
-
-    SetState(name) {
-      const prevState = this._currentState;
-      
-      if (prevState) {
-        if (prevState.Name == name) {
-          return;
-        }
-        prevState.Exit();
+  function setState(name) {
+    const prev = fsm.current;
+    if (prev) {
+      if (prev.name == name) {
+        return;
       }
-
-      const state = new this._states[name](this);
-
-      this._currentState = state;
-      state.Enter(prevState);
+      prev.exit();
     }
+    fsm.current = states[name](fsm);
+    fsm.current.enter(prev);
+  }
 
-    Update(timeElapsed, input) {
-      if (this._currentState) {
-        this._currentState.Update(timeElapsed, input);
-      }
-    }
-  };
-
-  return {
-    FiniteStateMachine: FiniteStateMachine
-  };
-
-})();
+  function update(timeElapsed, input) {
+    fsm.current?.update(timeElapsed, input);
+  }
+}
