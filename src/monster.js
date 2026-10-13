@@ -2,8 +2,7 @@
 
 import { createCharacter, setState, isAlive, moveCharacter, updateAttack, animate } from './character.js';
 import { angleTowards, groundDistance } from './math.js';
-import { createNode } from './renderer.js';
-import { loadObj } from './obj-loader.js';
+import { loadGltf, createModel } from './gltf-loader.js';
 
 export const MONSTER_TYPES = ['Ghost', 'Alien', 'Skull', 'GreenDemon', 'Cyclops', 'Cactus'];
 
@@ -12,19 +11,33 @@ const NOTICE_DISTANCE = 100;       // how close the player must be before a mons
 
 // Load the monster's model and its texture picture, then build the character.
 export async function createMonster(renderer, type, position) {
-	const [mesh, texture] = await Promise.all([
-		loadObj(renderer, './resources/monsters/OBJ/', type),
+	const [file, texture] = await Promise.all([
+		loadGltf(renderer, `./resources/models/monsters/${type}.glb`),
 		loadTexture(renderer, `./resources/monsters/Textures/${type}_Texture.png`),
 	]);
-	const body = createNode({ mesh, texture, scale: 2.7 });
+	const model = createModel(file);
+	// The monster files keep their picture separately: give it to every part of the model.
+	setTexture(model.root, texture);
+	// All animations are inside the monster's file; pick them by name.
+	const clip = (name) => file.clips.find(candidate => candidate.name.endsWith('|' + name));
 	return createCharacter({
 		renderer,
 		kind: 'monster',
-		model: { root: createNode({ children: [body] }), parts: null },
+		model,
+		clips: { idle: clip('Idle'), walk: clip('Walk'), attack: clip('Bite_Front'), death: clip('Death') },
+		scale: 2.5,
 		position,
 		stats: { health: 50, maxHealth: 50, strength: 2, wisdomness: 2, benchpress: 3, curl: 1 },
-		attack: { duration: 0.7, hitTime: 0.35, range: 6 },
+		attack: { hitTime: 0.35, range: 6 },
 	});
+}
+
+function setTexture(node, texture) {
+	if (node.mesh) {
+		node.texture = texture;
+		node.tint = [1, 1, 1];
+	}
+	node.children.forEach(child => setTexture(child, texture));
 }
 
 // Several monsters share the same picture; load each one only once.
@@ -38,14 +51,10 @@ function loadTexture(renderer, path) {
 
 // The monster's "brain", called every frame.
 export function updateMonster(monster, world, secondsElapsed) {
-	monster.stateTime += secondsElapsed;
-	if (!isAlive(monster)) {
-		animate(monster);
-		return;
-	}
-
 	const player = world.player;
-	if (monster.state == 'attack') {
+	if (!isAlive(monster)) {
+		// Dead: just let the death animation finish.
+	} else if (monster.state == 'attack') {
 		updateAttack(monster, world);
 	} else if (isAlive(player) && groundDistance(monster.position, player.position) < NOTICE_DISTANCE) {
 		// Face the player and walk; if the next step bumps into something, bite instead.
@@ -58,5 +67,5 @@ export function updateMonster(monster, world, secondsElapsed) {
 		setState(monster, 'idle');
 		moveCharacter(monster, world, 0, secondsElapsed);   // let friction bring it to a stop
 	}
-	animate(monster);
+	animate(monster, secondsElapsed);
 }

@@ -16,7 +16,7 @@ Read the files in order:
 | 4 | [How each file works](04-how-each-file-works.md) | A tour of every file in `src/`, one by one. |
 | 5 | [Walkthroughs](05-walkthroughs.md) | Step-by-step stories: pressing **W**, swinging the sword, killing a monster, levelling up, clicking the girl, dragging an item. |
 | 6 | [Recipes](06-recipes.md) | Small changes you can try: more monsters, stronger sword, faster running, a new quest. |
-| 7 | [Glossary](07-glossary.md) | Every abbreviation and technical word (OBJ, WGSL, GPU, UV, …) explained in plain words. |
+| 7 | [Glossary](07-glossary.md) | Every abbreviation and technical word (glTF, WGSL, GPU, UV, …) explained in plain words. |
 | 8 | [Questions and answers](08-questions-and-answers.md) | Answers to questions asked while reading the code. |
 
 ## Running the game
@@ -52,10 +52,14 @@ No internet connection is needed: there is nothing to download besides the files
 Quick_3D_RPG/
 ├── index.html      The web page: two canvases (3D picture + 2D overlay) and the menus
 ├── base.css        How the page looks, including the sky gradient
-├── resources/      3D models (.obj), textures (.png) and icons, made by other artists
+├── resources/      Art made by other artists: 3D models, animations, textures, icons
+│   └── models/     The models the game loads (.glb), converted from the artists' .fbx files
+├── tools/          convert-models.sh: makes resources/models/ from the .fbx files
 ├── src/            All the game code — this is what the docs explain
 └── docs/           You are here
 ```
 
-Only the `OBJ` folders and the `.png` files in `resources/` are used. The `.fbx`, `.glb` and `.blend`
-files are other versions of the same art that the game no longer needs.
+The artists delivered their models as `.fbx` files. The game reads `.glb` (glTF) files instead, because
+that format is open and simple enough to read with our own small loader (see
+[2.10](02-how-3d-drawing-works.md#210-model-file-formats-fbx-gltf-obj)). `tools/convert-models.sh` did the
+conversion once; you only need to run it again if you add or change an `.fbx` file.

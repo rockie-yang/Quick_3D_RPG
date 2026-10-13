@@ -7,7 +7,7 @@ Each recipe says which file to open and what to change. Reload the page after sa
 
 ### Only ghosts
 **`src/monster.js`**: `export const MONSTER_TYPES = ['Ghost'];`
-Other monsters available in `resources/monsters/OBJ`: Bat, Bee, Chicken, Crab, Cthulhu, Deer, Demon,
+Other monsters available in `resources/models/monsters`: Bat, Bee, Chicken, Crab, Cthulhu, Deer, Demon,
 Mushroom, Panda, Penguin, Pig, Tree, YellowDragon, Yeti, Alien_Tall.
 
 ### A stronger sword
@@ -16,7 +16,7 @@ Mushroom, Panda, Penguin, Pig, Tree, YellowDragon, Yeti, Alien_Tall.
 ### A new weapon
 **`src/inventory.js`**: add `Hammer: { name: 'Hammer', damage: 5, icon: 'war-axe-64.png', model: 'Hammer_Small' },`
 to `ITEMS`, and in **`src/main.js`** add `inventory.add('Hammer');`. Then drag it into an equipment slot.
-(Models are in `resources/weapons/OBJ`.)
+(Models are in `resources/models/weapons`.)
 
 ### Tougher monsters
 **`src/monster.js`**: in `createMonster`, raise `health` and `maxHealth` (e.g. `500`), or `strength` to hit harder.
@@ -41,21 +41,24 @@ to `ITEMS`, and in **`src/main.js`** add `inventory.add('Hammer');`. Then drag i
 things are placed — smaller means denser.
 
 ### Snowy world
-**`src/scenery.js`**: use the snow trees, e.g. `const TREE_TYPES = ['PineTree_Snow', 'CommonTree_Snow', 'BirchTree_Snow'];`
-and a white ground: `groundGeometry(5000, '#e8eef2')`.
+1. Convert the snow trees: in **`tools/convert-models.sh`**, add `PineTree_Snow CommonTree_Snow BirchTree_Snow` to the
+   list of tree kinds, and run `./tools/convert-models.sh`.
+2. **`src/scenery.js`**: `const TREE_TYPES = ['PineTree_Snow', 'CommonTree_Snow', 'BirchTree_Snow'];`
+   and a white ground: `tint: hexToColour('#e8eef2')`.
 
 ### Evening light
 **`src/main.js`**: in `LIGHTING`, lower the sun: `sunDirection: { x: -0.9, y: 0.2, z: 0.3 }`, and an orange fog
 `fogColour: [0.95, 0.7, 0.5]`. In **`base.css`** change the `.container` gradient to match.
 
-### A knight in different colours
-**`src/shapes.js`**: `buildKnight` — the colours passed to `buildPerson` (legs, arms, body, head).
-
-### Make the girl wave
-**`src/main.js`**, inside `frame`, before `renderer.render(...)`:
+### A red knight
+**`src/player.js`**: after `createModel(knight)`, tint every piece of the model, for example with a small helper:
 
 ```js
-girl.parts.rightArm.rotation.z = -2.5 + Math.sin(now / 200) * 0.4;
+const tintAll = (node) => { if (node.mesh) node.tint = [1, 0.6, 0.6]; node.children.forEach(tintAll); };
 ```
 
-(`now` is the time in milliseconds; `rotation.z` swings the arm sideways.)
+(The tint is multiplied with the texture picture — see [Material and texture](02-how-3d-drawing-works.md#24-material-and-texture).)
+
+### A different knight animation
+The original files include `Sword And Shield Kick.fbx`, `Jump`, `Impact`. Add `Kick` to the animation list in
+**`tools/convert-models.sh`**, run it, then in **`src/player.js`** load `kick.glb` and use its clip as `attack`.

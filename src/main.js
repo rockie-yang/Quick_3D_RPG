@@ -10,8 +10,9 @@ import { createScenery, randomPosition } from './scenery.js';
 import { createPlayer, updatePlayer } from './player.js';
 import { createMonster, updateMonster, MONSTER_TYPES } from './monster.js';
 import { createSparkles, updateSparkles } from './sparkles.js';
-import { buildGirl } from './shapes.js';
-import { loadObj } from './obj-loader.js';
+import { createSpatialGrid } from './spatial-grid.js';
+import { loadGltf, createModel } from './gltf-loader.js';
+import { createAnimator, play, updateAnimator } from './animation.js';
 import { pickRandom } from './math.js';
 
 // Lighting and fog, shared by the whole picture.
@@ -32,15 +33,11 @@ async function startGame() {
 		const userInterface = createUserInterface();
 		const overlay = createOverlay();
 		const camera = createCamera();
-		const player = createPlayer(renderer);
 
-		// The quest giver: stands still 30 units from the centre, facing it.
-		const girl = buildGirl(renderer);
-		girl.root.position = { x: 30, y: 0, z: 0 };
-		girl.root.rotation.y = -Math.PI / 2;
-
-		// Load the scenery and 50 random monsters, all at the same time.
-		const [scenery, monsters] = await Promise.all([
+		// Load the player, the girl, the scenery and 50 random monsters, all at the same time.
+		const [player, girl, scenery, monsters] = await Promise.all([
+			createPlayer(renderer),
+			createGirl(renderer),
 			createScenery(renderer),
 			Promise.all(Array.from({ length: 50 }, () => createMonster(renderer, pickRandom(MONSTER_TYPES), randomPosition()))),
 		]);
@@ -49,11 +46,15 @@ async function startGame() {
 		const world = {
 			player,
 			monsters,
-			obstacles: [...scenery.treePositions, girl.root.position],
+			grid: createSpatialGrid(),          // finds what is near a spot (see spatial-grid.js)
 			sparkles: [],                      // level-up particles currently flying
 			onHealthChanged: (character) => character == player && userInterface.showStats(player.stats),
 			onLevelUp: (character) => world.sparkles.push(...createSparkles(character.position)),
 		};
+		// The girl and the trees are obstacles; characters can't walk through them.
+		for (const thing of [player, ...monsters, ...scenery.obstacles, { kind: 'obstacle', position: girl.root.position }]) {
+			world.grid.add(thing);
+		}
 
 		// Start with both weapons in the backpack and the sword in hand.
 		const inventory = createInventory((item) => equipWeapon(renderer, player, item));
@@ -84,10 +85,11 @@ async function startGame() {
 			for (const monster of monsters) {
 				updateMonster(monster, world, secondsElapsed);
 			}
+			updateAnimator(girl.animator, secondsElapsed);
 			world.sparkles = updateSparkles(world.sparkles, secondsElapsed);
 			updateCamera(camera, player, secondsElapsed);
 
-			const nodes = [...scenery.nodes, girl.root, player.model.root, ...monsters.map(monster => monster.model.root)];
+			const nodes = [...scenery.nodes, girl.root, player.root, ...monsters.map(monster => monster.root)];
 			renderer.render(nodes, camera, LIGHTING);
 			overlay.draw(world, renderer.project, secondsElapsed);
 			requestAnimationFrame(frame);
@@ -98,17 +100,37 @@ async function startGame() {
 	}
 }
 
+// The quest giver: stands still 30 units from the centre, facing it, playing her idle animation.
+async function createGirl(renderer) {
+	const [file, idle] = await Promise.all([
+		loadGltf(renderer, './resources/models/girl/girl.glb'),
+		loadGltf(renderer, './resources/models/girl/idle.glb'),
+	]);
+	const model = createModel(file);
+	const animator = createAnimator(model);
+	play(animator, idle.clips[0]);
+	const root = createNode({ position: { x: 30, y: 0, z: 0 }, rotation: { y: -Math.PI / 2 }, scale: 3, children: [model.root] });
+	return { root, animator };
+}
+
 // Load the weapon's model and put it in the knight's right hand (replacing what was there).
 async function equipWeapon(renderer, player, item) {
 	player.weapon = item;
-	const mesh = await loadObj(renderer, './resources/weapons/OBJ/', item.model);
-	// Turned a quarter turn so the blade points forward out of the fist.
-	player.model.parts.rightHand.children = [createNode({ mesh, scale: 0.6, rotation: { x: Math.PI / 2 } })];
+	const file = await loadGltf(renderer, `./resources/models/weapons/${item.model}.glb`);
+	// Resized and turned so the handle sits in the fist and the blade points forward.
+	const weapon = createNode({
+		scale: 0.22,
+		rotation: { y: Math.PI, x: -Math.PI / 3 },
+		children: [createNode({ rotation: { y: -1 }, children: [createModel(file).root] })],
+	});
+	player.bones.RightHandIndex1.children = player.bones.RightHandIndex1.children.filter(child => !child.isWeapon);
+	weapon.isWeapon = true;
+	player.bones.RightHandIndex1.children.push(weapon);
 }
 
 // Was the click on the girl? Check a rectangle around her, from her feet to the top of her head on screen.
 function isOnGirl(renderer, girl, x, y) {
-	const feet = renderer.project(girl.root.position);
+	const feet = renderer.project(girl.root.position);   // her feet are at the node's position
 	const head = renderer.project({ ...girl.root.position, y: 6 });
 	const halfWidth = (feet.y - head.y) / 4;
 	return feet.inFront && y >= head.y && y <= feet.y && Math.abs(x - feet.x) <= halfWidth;

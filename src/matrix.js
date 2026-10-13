@@ -47,6 +47,17 @@ export function rotationZ(angle) {
 	return new Float32Array([cosine, sine, 0, 0, -sine, cosine, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
 }
 
+// Turn described by a quaternion [x, y, z, w]: four numbers that store a rotation around any axis.
+// Model files store rotations this way because two quaternions blend smoothly (see animation.js).
+export function rotationFromQuaternion([x, y, z, w]) {
+	return new Float32Array([
+		1 - 2 * (y * y + z * z), 2 * (x * y + z * w), 2 * (x * z - y * w), 0,
+		2 * (x * y - z * w), 1 - 2 * (x * x + z * z), 2 * (y * z + x * w), 0,
+		2 * (x * z + y * w), 2 * (y * z - x * w), 1 - 2 * (x * x + y * y), 0,
+		0, 0, 0, 1,
+	]);
+}
+
 // The camera lens: things further away look smaller.
 // fieldOfView is how wide the camera sees (in radians), near/far are the closest and furthest visible distances.
 // (WebGPU wants depth from 0 at `near` to 1 at `far`.)

@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1010 480" width="1010" height="480" font-family="Helvetica, Arial, sans-serif" font-size="14">
+  <rect width="1010" height="480" fill="#ffffff"/>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#444"/>
+    </marker>
+    <pattern id="checker" width="20" height="20" patternUnits="userSpaceOnUse">
+      <rect width="20" height="20" fill="#cfd8e3"/>
+      <rect width="10" height="10" fill="#b7c3d1"/>
+      <rect x="10" y="10" width="10" height="10" fill="#b7c3d1"/>
+    </pattern>
+  </defs>
+
+  <!-- 1. The texture -->
+  <text x="40" y="30" font-weight="bold" font-size="16">1. Texture = a picture</text>
+  <text x="40" y="50" fill="#555">a grid of coloured pixels (e.g. 512 × 512)</text>
+  <g transform="translate(60,100)">
+    <rect width="220" height="220" fill="url(#checker)" stroke="#333"/>
+    <!-- a simple painted "ghost face" -->
+    <ellipse cx="110" cy="115" rx="80" ry="85" fill="#e9eef5" stroke="#8a97a8"/>
+    <ellipse cx="80" cy="95" rx="12" ry="16" fill="#222"/>
+    <ellipse cx="140" cy="95" rx="12" ry="16" fill="#222"/>
+    <ellipse cx="110" cy="150" rx="22" ry="14" fill="#7a2f4f"/>
+    <!-- the triangle's corners on the picture -->
+    <polygon points="44,66 176,66 110,176" fill="none" stroke="#d0402b" stroke-width="2.5" stroke-dasharray="6 4"/>
+    <circle cx="44" cy="66" r="6" fill="#d0402b"/><text x="20" y="62" fill="#d0402b" font-weight="bold">A</text>
+    <circle cx="176" cy="66" r="6" fill="#d0402b"/><text x="184" y="62" fill="#d0402b" font-weight="bold">B</text>
+    <circle cx="110" cy="176" r="6" fill="#d0402b"/><text x="118" y="196" fill="#d0402b" font-weight="bold">C</text>
+    <!-- u and v axes -->
+    <line x1="0" y1="-14" x2="220" y2="-14" stroke="#333" marker-end="url(#arrow)"/>
+    <text x="-6" y="-20" fill="#333">0</text><text x="200" y="-20" fill="#333">u = 1</text>
+    <line x1="-14" y1="0" x2="-14" y2="220" stroke="#333" marker-end="url(#arrow)"/>
+    <text x="-48" y="226" fill="#333">v = 1</text>
+  </g>
+  <text x="40" y="350" fill="#333">Every point of the picture has an address</text>
+  <text x="40" y="368" fill="#333">(u, v), both from 0 to 1:</text>
+  <text x="40" y="390" fill="#d0402b">A = (0.2, 0.3)  B = (0.8, 0.3)</text>
+  <text x="40" y="408" fill="#d0402b">C = (0.5, 0.8)</text>
+
+  <!-- arrow to the model -->
+  <path d="M300,210 C340,210 350,200 380,190" stroke="#444" fill="none" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- 2. The model's triangle -->
+  <text x="390" y="30" font-weight="bold" font-size="16">2. Each corner stores its (u, v)</text>
+  <text x="390" y="50" fill="#555">the model file says which spot of the</text>
+  <text x="390" y="66" fill="#555">picture each corner shows</text>
+  <g transform="translate(400,80)">
+    <polygon points="30,40 230,90 120,230" fill="#e9eef5" stroke="#333" stroke-width="1.5"/>
+    <!-- the stretched picture part, roughly -->
+    <ellipse cx="95" cy="90" rx="13" ry="17" fill="#222" transform="rotate(14 95 90)"/>
+    <ellipse cx="165" cy="108" rx="13" ry="17" fill="#222" transform="rotate(14 165 108)"/>
+    <ellipse cx="125" cy="165" rx="22" ry="13" fill="#7a2f4f" transform="rotate(14 125 165)"/>
+    <circle cx="30" cy="40" r="6" fill="#d0402b"/><text x="4" y="34" fill="#d0402b" font-weight="bold">A</text>
+    <circle cx="230" cy="90" r="6" fill="#d0402b"/><text x="238" y="88" fill="#d0402b" font-weight="bold">B</text>
+    <circle cx="120" cy="230" r="6" fill="#d0402b"/><text x="128" y="246" fill="#d0402b" font-weight="bold">C</text>
+    <!-- one pixel -->
+    <rect x="140" y="140" width="10" height="10" fill="none" stroke="#1a7f37" stroke-width="2.5"/>
+    <line x1="140" y1="150" x2="70" y2="268" stroke="#1a7f37"/>
+    <text x="-10" y="284" fill="#1a7f37">one pixel: its (u, v) is a blend of A, B, C</text>
+  </g>
+  <text x="390" y="390" fill="#333">For every pixel inside the triangle, the</text>
+  <text x="390" y="408" fill="#333">graphics card blends the corners' (u, v)</text>
+  <text x="390" y="426" fill="#333">and looks up that spot in the picture</text>
+  <text x="390" y="444" fill="#333">("sampling"): the picture is stretched</text>
+  <text x="390" y="462" fill="#333">over the triangle like a sticker.</text>
+
+  <path d="M690,190 C710,190 730,190 750,190" stroke="#444" fill="none" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- 3. The material recipe -->
+  <text x="765" y="30" font-weight="bold" font-size="16">3. Material = the recipe</text>
+  <text x="765" y="50" fill="#555">how one pixel's colour is made</text>
+  <g transform="translate(765,75)" font-size="13">
+    <rect width="225" height="56" rx="6" fill="#f3f6fa" stroke="#9aa7b8"/>
+    <text x="10" y="22" font-weight="bold">texture colour at (u, v)</text>
+    <text x="10" y="42" fill="#555">white if the material has no picture</text>
+    <text x="104" y="76" font-size="18">×</text>
+    <rect y="86" width="225" height="56" rx="6" fill="#f3f6fa" stroke="#9aa7b8"/>
+    <text x="10" y="108" font-weight="bold">material colour (tint)</text>
+    <text x="10" y="128" fill="#555">white if the picture says it all</text>
+    <text x="104" y="162" font-size="18">×</text>
+    <rect y="172" width="225" height="56" rx="6" fill="#f3f6fa" stroke="#9aa7b8"/>
+    <text x="10" y="194" font-weight="bold">sunlight</text>
+    <text x="10" y="214" fill="#555">skipped if the material is "unlit"</text>
+    <text x="95" y="248" font-size="18">then</text>
+    <rect y="258" width="225" height="56" rx="6" fill="#f3f6fa" stroke="#9aa7b8"/>
+    <text x="10" y="280" font-weight="bold">fog</text>
+    <text x="10" y="300" fill="#555">fade with distance</text>
+    <text x="10" y="345" font-weight="bold" fill="#1a7f37">= the pixel's colour</text>
+  </g>
+  <text x="40" y="430" fill="#555" font-size="13">The texture is one ingredient</text>
+  <text x="40" y="448" fill="#555" font-size="13">of the material: a material can be a plain</text>
+  <text x="40" y="466" fill="#555" font-size="13">colour, or use a picture, or both.</text>
+</svg>

@@ -40,6 +40,11 @@ This game also never lets one frame be longer than 1/30 of a second (`MAXIMUM_ST
 Browsers pause `requestAnimationFrame` while the tab is hidden; without the limit, the first frame after
 coming back would see minutes pass at once and everything would jump.
 
+The opposite case — frames coming *very fast* — needs nothing special: the time per frame is then small,
+so everything moves a little per frame and the same amount per second. (See
+[Questions and answers](08-questions-and-answers.md#should-the-game-loop-skip-a-frame-when-requestanimationframe-comes-too-fast)
+for when you might still want to limit the frame rate.)
+
 ## 1.3 Coordinates: x, y, z
 
 Every point in the world is three numbers:
@@ -113,35 +118,47 @@ stateDiagram-v2
 ```
 
 This is called a **finite state machine** ("finite" = a fixed list of states). In this game it is very
-simple: `character.state` is a string, and `setState(character, 'walk')` changes it and resets
-`character.stateTime` (the seconds spent in the state so far). Nothing else is needed.
+simple: `character.state` is a string, and `setState(character, 'walk')` changes it and starts that
+state's animation. Nothing else is needed.
 
 **In this game:** `setState` in `src/character.js`; the rules in `updatePlayer` (`src/player.js`) and `updateMonster` (`src/monster.js`).
 
-## 1.7 Animation without animation files
+## 1.7 Skeletons and animation
 
-Professional games record animations (a "walk" clip) in the model file. This game keeps it simpler:
-the knight is built from boxes, and the arms and legs are **turned by code** each frame using the
-state and the time in that state. Walking is just a sine wave:
+A character model is not a statue. Inside it is a **skeleton** of **bones** — hips, spine, upper arm,
+lower arm, hand, fingers… (the knight has 41). The **skin** (the visible surface) is tied to the bones:
+each corner of the skin follows one or more nearby bones. Move the arm bone, and the sleeve follows.
 
-```js
-const swing = Math.sin(time * 8) * 0.6;   // goes smoothly back and forth between -0.6 and 0.6
-leftLeg.rotation.x = swing;
-rightLeg.rotation.x = -swing;             // the other leg goes the opposite way
-```
+An **animation clip** ("walk", "slash") is a recording of how every bone moves over a second or two,
+stored as **key frames**: "at 0.00 s the knee is bent this much, at 0.04 s this much, …". To show the
+pose at any moment, the game finds the two key frames around that time and blends between them.
 
-This is called **procedural animation** (made by a procedure, i.e. code). See `animate` in `src/character.js`.
+When the knight switches from walking to running, the two clips are **cross-faded**: for 0.15 seconds
+the pose is a mix of both, sliding from all-walk to all-run, so he doesn't snap from one pose to the next.
+
+**In this game:** `src/animation.js` (playing and blending clips), the clips themselves are in
+`resources/models/` (the knight has one file per animation; each monster has all of its clips inside its own file).
+How the skin follows the bones is in [2.6](02-how-3d-drawing-works.md#26-skinning-how-the-skin-follows-the-bones).
 
 ## 1.8 Collisions — not walking through things
 
 Before moving, a character works out where it *would* be, then checks: is any tree, or any other living
-character, closer than a few units to that spot? If yes, it does not move. That is all.
+character, closer than a few units to that spot? If yes, it does not move.
 
-With about 170 things in the world, checking every one every frame is fast enough. (Big games with
-thousands of objects split the map into squares — a *spatial grid* — so they only check nearby squares.
-This game does not need that.)
+To answer "what is near this spot?" without checking all ~170 things in the world every time, the
+ground is divided into squares of 20 × 20 units, like a chess board. Each thing is listed in the square
+it stands on, so the question only needs to look at the few squares around the spot. This is a
+**spatial grid**.
 
-**In this game:** `moveCharacter` in `src/character.js`.
+```
+   +-----+-----+-----+
+   |     |  T  |     |      T = tree, M = monster, P = player
+   +-----+-----+-----+      Things near P: only these 9 squares
+   |  M  |  P  |     |      are checked, not the whole map.
+   +-----+-----+-----+
+```
+
+**In this game:** `src/spatial-grid.js`; used by `moveCharacter` and `updateAttack` in `src/character.js`.
 
 ## 1.9 Particles
 

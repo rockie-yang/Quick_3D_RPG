@@ -12,9 +12,10 @@ Follow along in the files named in **bold**.
 3. The player is not attacking, W is held, Shift is not → `setState(player, 'walk')` (**`character.js`**).
 4. `moveCharacter` adds 50 × seconds to `player.speed`, takes away some friction, and works out the next
    spot along the facing direction. No tree or living character is too close → `player.position` changes.
-5. `animate` copies the position and facing onto the knight's root node and swings the legs and arms with a sine wave.
+5. `setState` started the walk animation, cross-fading from idle over 0.15 s (**`animation.js`**). `animate` copies the
+   position and facing onto the knight's node and moves the animation forward, which turns his bones.
 6. **`camera.js`** `updateCamera` glides after the player.
-7. **`renderer.js`** draws the frame: the knight's root node has moved, so all its boxes (and the sword) are drawn in the new spot.
+7. **`renderer.js`** draws the frame: the knight's node has moved, so his skin, his bones and the sword in his hand are all drawn in the new spot.
 
 When you let go of W, the state becomes `idle` and friction slows the knight to a stop.
 
@@ -31,17 +32,17 @@ sequenceDiagram
     Keyboard->>Player: keys.space = true
     Player->>Player: setState(player, 'attack')
     loop every frame of the swing
-        Player->>Attack: stateTime grows; arm follows the swing curve
+        Player->>Attack: the slash animation plays
     end
-    Note over Attack: stateTime passes hitTime (0.4 s)
-    Attack->>Attack: monsters within 7 units and in front?
+    Note over Attack: animation time passes hitTime (0.7 s)
+    Attack->>Attack: grid.findNear: monsters within 7 units and in front?
     Attack->>Monster: damage 50 × 3 = 150 → health 0 → setState(monster, 'death')
     Attack->>Player: gainExperience(100) → level 2, stats grow
     Attack->>World: onLevelUp(player) → sparkles; onHealthChanged → stats on screen
-    Note over Attack: stateTime passes duration (0.8 s) → setState(player, 'idle')
+    Note over Attack: slash animation finished → setState(player, 'idle')
 ```
 
-- The dead monster tips over (`animate`), its floating health bar slides to empty and disappears
+- The dead monster plays its death animation, its floating health bar slides to empty and disappears
   (**`overlay.js`**), and it no longer blocks movement (only *living* characters do).
 
 ## 5.3 A monster attacks you
@@ -78,5 +79,5 @@ At 0 health the knight falls over, keys no longer do anything, and the monsters 
 2. Open the backpack (middle icon) and drag the axe. `ondragstart` remembers which slot it came from.
 3. Drop it on an equipment slot: `swap` exchanges the two slots' contents and icons.
 4. The target is an equipment slot → `onEquip(ITEMS.Axe)` → **`main.js`** `equipWeapon`:
-   `player.weapon` becomes the axe, `Axe.obj` is loaded, and the hand node's children are replaced with it.
+   `player.weapon` becomes the axe, `Axe.glb` is loaded, and it replaces the sword on the `RightHandIndex1` bone.
 5. The next hit uses the axe's `damage`.
