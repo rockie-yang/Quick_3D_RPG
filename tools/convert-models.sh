@@ -41,3 +41,6 @@ for file in resources/weapons/FBX/*.fbx; do convert "$file" weapons; done
 for kind in CommonTree CommonTree_Dead BirchTree BirchTree_Dead Willow Willow_Dead PineTree; do
 	for variant in 1 2 3 4 5; do convert "resources/nature/FBX/${kind}_${variant}.fbx" trees; done
 done
+
+# The converter unpacks embedded pictures into "*.fbm" folders next to the .fbx files; they are not needed.
+rm -rf resources/*/*.fbm
