@@ -1,7 +1,7 @@
 # 1. Game development basics
 
-Before looking at this game's code, here are the handful of ideas that almost every 3D game is built on.
-Each section ends with **"In this game"**, pointing at where the idea shows up in the code.
+The handful of ideas that almost every game is built on. Each section ends with **"In this game"**,
+pointing at where the idea shows up in the code.
 
 ---
 
@@ -19,11 +19,10 @@ forever:
     3. draw the world          (turn the 3D world into a 2D picture on the screen)
 ```
 
-The browser gives us a function, `requestAnimationFrame(callback)`, that says
-"call `callback` right before you next repaint the screen". Calling it again from inside the callback
-makes a loop that is perfectly in step with the monitor.
+The browser gives us `requestAnimationFrame(callback)`: "call `callback` right before you next repaint the
+screen". Calling it again from inside the callback makes a loop that is in step with the monitor.
 
-**In this game:** `onAnimationFrame` at the bottom of `src/main.js`.
+**In this game:** `frame()` in `src/main.js`.
 
 ## 1.2 Time between frames ("seconds elapsed")
 
@@ -31,40 +30,17 @@ A fast computer might draw 144 frames per second, a slow one 30. If we moved the
 "1 unit per frame", they would run 5 times faster on the fast computer!
 
 So every update gets the **time since the previous frame**, in seconds — usually about `0.016`
-(that is 1/60 of a second). Movement is always written as *speed × time*:
+(1/60 of a second). Movement is always written as *speed × time*:
 
 ```js
-position += speed * secondsElapsed;   // same speed on every computer
+position.x += speed * secondsElapsed;   // same speed on every computer
 ```
 
-This game also caps the time at 1/30 of a second, so that if the browser tab was in the background
-for a while, nobody teleports across the map when you come back.
+This game also never lets one frame be longer than 1/30 of a second (`MAXIMUM_STEP_SECONDS` in `main.js`).
+Browsers pause `requestAnimationFrame` while the tab is hidden; without the limit, the first frame after
+coming back would see minutes pass at once and everything would jump.
 
-**In this game:** every `update(secondsElapsed)` function.
-
-## 1.3 The 3D world: scene, mesh, camera, light, renderer
-
-We use a library called **three.js** to do the hard 3D maths. It has five main ideas:
-
-| three.js idea | Real-world comparison |
-|---------------|----------------------|
-| **Scene** | A film set. Everything that should be visible is added to it. |
-| **Mesh** (or *model*) | A prop on the set: a shape (geometry, made of triangles) plus a material (colour, texture, shininess). |
-| **Camera** | The film camera. Only what it sees ends up on screen. |
-| **Light** | Lamps on the set. Without them, everything is black. |
-| **Renderer** | The camera operator who takes the picture and puts it into the web page's `<canvas>`. |
-
-Every frame: `renderer.render(scene, camera)` — "take a picture of this set with this camera".
-
-The artists' 3D models are stored in files (`.fbx`, `.glb`). A **loader** reads such a file and
-gives back a ready-to-use mesh, possibly with a skeleton and animations.
-
-How these pieces nest inside each other is explained in detail in [three.js concepts](02-threejs-concepts.md).
-
-**In this game:** `src/main.js` creates the renderer, camera, sun, ground and sky. `src/model-component.js`,
-`src/player-entity.js` and `src/monster-controller.js` load model files.
-
-## 1.4 Coordinates: x, y, z
+## 1.3 Coordinates: x, y, z
 
 Every point in the world is three numbers:
 
@@ -72,46 +48,34 @@ Every point in the world is three numbers:
         y (up)
         |
         |
-        +------ x (right)
+        +------ x
        /
       /
-     z (towards you / "forward" for the characters here)
+     z (the direction a character faces when its facing angle is 0)
 ```
 
-The ground is the flat x–z plane at `y = 0`. The world in this game is about 1000 × 1000 units.
-A **unit** has no fixed size; here one unit is very roughly 30 cm (the knight is about 6 units tall).
+The ground is the flat x–z plane at `y = 0`. The world is about 1000 × 1000 units.
+One **unit** has no fixed size; the knight is 6 units tall, so one unit is about 30 cm.
 
-## 1.5 Vectors
+In the code a position is a plain object: `{ x: 30, y: 0, z: 0 }`.
 
-A **vector** is just those three numbers bundled together: `new THREE.Vector3(x, y, z)`.
-It can mean a **position** ("where") or a **direction / velocity** ("which way, and how fast").
+## 1.4 Directions and facing
 
-Things you will see done with vectors:
+Characters only turn left and right, so their direction is a single number: the **facing angle**, in
+**radians** (a full turn is 2π ≈ 6.28; a quarter turn is π/2 ≈ 1.57).
+`directionFromAngle(angle)` in `src/math.js` turns it into a direction `{ x: sin(angle), y: 0, z: cos(angle) }`,
+and `angleTowards(from, to)` gives the angle to face something.
 
-| Operation | Meaning |
-|-----------|---------|
-| `a.add(b)` | Move point `a` by `b` |
-| `a.sub(b)` | The arrow from `b` to `a` |
-| `v.normalize()` | Keep the direction but make the length exactly 1 |
-| `v.multiplyScalar(5)` | Make it 5 times as long |
-| `a.dot(b)` | For two length-1 vectors: 1 if they point the same way, 0 if at right angles, −1 if opposite. Used to check "is the monster in front of me?" |
-| `a.lerp(b, 0.1)` | Move `a` 10% of the way towards `b` (see *linear interpolation* below) |
+Two more tricks:
 
-## 1.6 Rotations: quaternions
+- **Distance** on the ground: `Math.hypot(a.x - b.x, a.z - b.z)` (Pythagoras).
+- **"Is it in front of me?"**: multiply the matching parts of two directions and add them up
+  (the **dot product**). It is 1 when they point the same way, 0 at right angles, −1 when opposite.
+  Attacks only hit when the dot product is above 0.9 (within about 25°).
 
-A rotation could be stored as three angles, but that has nasty problems (look up "gimbal lock" if curious).
-3D engines use a **quaternion** instead: four numbers that describe "rotate by this much around this axis".
-You never need to read the four numbers yourself. You only use it like this:
+## 1.5 Smooth movement: linear interpolation
 
-```js
-const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(rotation); // which way am I facing?
-rotation.multiply(turnALittle);                                       // turn a bit more
-```
-
-## 1.7 Linear interpolation ("lerp") — smooth movement
-
-To *interpolate* is to find a value in between two others. **Linear interpolation** with an amount
-from 0 to 1:
+To *interpolate* is to find a value between two others. **Linear interpolation** with an amount from 0 to 1:
 
 ```
 linearInterpolate(0.0, 10, 20) = 10
@@ -119,85 +83,69 @@ linearInterpolate(0.5, 10, 20) = 15
 linearInterpolate(1.0, 10, 20) = 20
 ```
 
-Doing "move 10% closer to the target" every frame gives a smooth, slightly springy motion.
-The camera and the floating health bars use this trick, so they glide instead of jumping.
+Doing "move 7% closer to the goal" every frame gives smooth, gliding motion.
+The camera and the floating health bars use this.
 
-**In this game:** `linearInterpolate` in `src/math.js`; `.lerp(...)` in `src/third-person-camera.js`.
+A **curve** is the same idea with several points: `curve([[0, 0], [0.35, -3], [1, 0]], time)` goes from 0
+to −3 and back to 0. The sword swing and the sparkles' fading are described with curves.
 
-## 1.8 Skeletons and animation
-
-Characters are not a solid statue. Inside the mesh is a **skeleton** of **bones** (joints: hips, knees,
-right hand, …). The skin follows the bones. An **animation clip** (e.g. "walk") is a recording of how
-every bone moves over a second or two.
-
-three.js plays clips with:
-
-- **AnimationMixer** — one per character, it actually moves the bones every frame (`mixer.update(seconds)`).
-- **AnimationAction** — one per clip; you `play()` it, set it to loop or play once, and
-  **cross-fade** from one clip to another so the change from "walk" to "run" is smooth instead of snapping.
-
-Because the weapon is attached to the "RightHandIndex1" bone, it automatically follows the hand.
-
-**In this game:** `src/player-state.js` (which clip plays when), `src/equip-weapon-component.js` (sword on the hand bone).
-
-## 1.9 A finite state machine — "what am I doing right now?"
+## 1.6 States — "what am I doing right now?"
 
 The knight is always doing **exactly one** of: *idle*, *walk*, *run*, *attack*, *death*.
-Each of these is a **state**. Rules say when to move to another state:
+Each is a **state**. Rules say when to change state:
 
 ```mermaid
 stateDiagram-v2
     [*] --> idle
-    idle --> walk: W or S pressed
-    idle --> attack: Space pressed
+    idle --> walk: W or S held
     walk --> run: Shift held
     run --> walk: Shift released
-    walk --> idle: W and S released
-    run --> idle: W and S released
-    attack --> idle: swing animation finished
+    walk --> idle: nothing held
+    run --> idle: nothing held
+    idle --> attack: Space
+    walk --> attack: Space
+    run --> attack: Space
+    attack --> idle: swing finished
     idle --> death: health reaches 0
     walk --> death: health reaches 0
     run --> death: health reaches 0
     attack --> death: health reaches 0
 ```
 
-"Finite" just means there is a fixed list of states. This pattern keeps character logic tidy:
-each state only has to think about its own situation.
+This is called a **finite state machine** ("finite" = a fixed list of states). In this game it is very
+simple: `character.state` is a string, and `setState(character, 'walk')` changes it and resets
+`character.stateTime` (the seconds spent in the state so far). Nothing else is needed.
 
-**In this game:** `src/finite-state-machine.js` (the machine), `src/player-state.js` (the states).
+**In this game:** `setState` in `src/character.js`; the rules in `updatePlayer` (`src/player.js`) and `updateMonster` (`src/monster.js`).
 
-## 1.10 Collision and "who is near me?"
+## 1.7 Animation without animation files
 
-To stop the knight walking through a tree, or to find what the sword hits, the game must ask
-"which things are near this point?". Checking all ~170 objects every frame for every character would
-be slow. So the map is cut into a grid of 100 × 100 squares (**cells**), and every object is listed in the
-cell it stands in. To find neighbours you only look in the few cells around you.
-This is called a **spatial hash grid** ("spatial" = about space/position).
+Professional games record animations (a "walk" clip) in the model file. This game keeps it simpler:
+the knight is built from boxes, and the arms and legs are **turned by code** each frame using the
+state and the time in that state. Walking is just a sine wave:
 
-**In this game:** `src/spatial-hash-grid.js` and `src/spatial-grid-controller.js`.
+```js
+const swing = Math.sin(time * 8) * 0.6;   // goes smoothly back and forth between -0.6 and 0.6
+leftLeg.rotation.x = swing;
+rightLeg.rotation.x = -swing;             // the other leg goes the opposite way
+```
 
-## 1.11 Shaders — tiny programs on the graphics card
+This is called **procedural animation** (made by a procedure, i.e. code). See `animate` in `src/character.js`.
 
-The graphics card (GPU, graphics processing unit) draws millions of pixels per frame. You can give it
-small programs, written in a language called GLSL (OpenGL Shading Language), to control how
-something is drawn. There are always two:
+## 1.8 Collisions — not walking through things
 
-| Shader | Runs once per … | Its job |
-|--------|-----------------|---------|
-| **Vertex shader** | corner (vertex) of every triangle | Decide *where* on screen that corner goes. |
-| **Fragment shader** | pixel the triangle covers | Decide *what colour* that pixel is. ("Fragment" is the graphics word for "a pixel being drawn".) |
+Before moving, a character works out where it *would* be, then checks: is any tree, or any other living
+character, closer than a few units to that spot? If yes, it does not move. That is all.
 
-Values passed from JavaScript to a shader are called **uniforms** (same for every pixel), values passed
-from the vertex shader to the fragment shader are called **varyings** (they vary smoothly across the triangle).
+With about 170 things in the world, checking every one every frame is fast enough. (Big games with
+thousands of objects split the map into squares — a *spatial grid* — so they only check nearby squares.
+This game does not need that.)
 
-Most objects use three.js's built-in shaders. This game writes three of its own:
-the gradient sky (`src/main.js`), the floating health bars (`src/health-bar.js`), and the level-up
-sparkles (`src/particle-system.js`).
+**In this game:** `moveCharacter` in `src/character.js`.
 
-## 1.12 Particles
+## 1.9 Particles
 
-Fire, smoke, sparkles and magic are usually **particles**: hundreds of tiny flat images, each with its
-own position, speed, colour, size and remaining life. Every frame they move, fade, and are deleted when
-their life runs out.
+Sparkles, smoke and magic are usually **particles**: many tiny dots, each with its own position, speed,
+colour, size and remaining life. Every frame they move and fade, and are removed when their life runs out.
 
-**In this game:** `src/particle-system.js`, used by `src/level-up-component.js`.
+**In this game:** `src/sparkles.js` — the burst when you level up.

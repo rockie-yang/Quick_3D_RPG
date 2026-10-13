@@ -5,111 +5,78 @@ Follow along in the files named in **bold**.
 
 ---
 
-## 4.1 You press W
+## 5.1 You press W
 
-1. The browser fires a `keydown` event with key code 87.
-   **`player-input.js`** → `setKey` sets `keys.forward = true`.
-2. Next frame, **`main.js`** `onAnimationFrame` → `entityManager.update` → player entity `update` →
-   **`player-entity.js`** `update`.
-3. `stateMachine.update(...)` → the current state is `IdleState` (**`player-state.js`**), which sees
-   `keys.forward` and calls `stateMachine.setState('walk')`.
-4. **`finite-state-machine.js`** builds a `WalkState` and calls `enter(previousState)`, which cross-fades
-   the idle animation into the walk animation over 0.1 seconds.
-5. Back in the controller: `velocity.z` increases by 50 × seconds. `nextPosition` works out the new spot
-   one small step ahead.
-6. `collides` asks the grid for neighbours within 5 units. Nothing within 4 units → move.
-7. `entity.setPosition(position)` broadcasts `update.position`:
-   - **`spatial-grid-controller.js`** updates the player's cell in the grid.
-8. **`third-person-camera.js`** (its own entity, updated in the same loop) sees the player's new position
-   and glides after it.
-9. **`main.js`** `updateSun` moves the shadow area to follow, and `renderer.render` draws the picture.
+1. The browser fires `keydown` with `event.code == 'KeyW'`. **`input.js`** sets `keys.forward = true`.
+2. Next frame, **`main.js`** `frame` calls **`player.js`** `updatePlayer`.
+3. The player is not attacking, W is held, Shift is not → `setState(player, 'walk')` (**`character.js`**).
+4. `moveCharacter` adds 50 × seconds to `player.speed`, takes away some friction, and works out the next
+   spot along the facing direction. No tree or living character is too close → `player.position` changes.
+5. `animate` copies the position and facing onto the knight's root node and swings the legs and arms with a sine wave.
+6. **`camera.js`** `updateCamera` glides after the player.
+7. **`renderer.js`** draws the frame: the knight's root node has moved, so all its boxes (and the sword) are drawn in the new spot.
 
-When you release W, `keys.forward` becomes false, `WalkState.update` switches to idle, and friction
-(`applyDeceleration`) slows the knight down.
+When you let go of W, the state becomes `idle` and friction slows the knight to a stop.
 
-## 4.2 You press Space next to a monster
+## 5.2 You press Space next to a monster
 
 ```mermaid
 sequenceDiagram
     participant Keyboard
-    participant Input as player-input
-    participant State as AttackState
-    participant Controller as player-entity
-    participant Attack as attacker-controller
-    participant Grid as spatial grid
-    participant MonsterHealth as monster health-component
-    participant Bar as monster health-bar
-    participant MonsterBrain as monster-controller
-    participant PlayerHealth as player health-component
+    participant Player as updatePlayer
+    participant Attack as updateAttack (character.js)
+    participant Monster as monster object
+    participant World as world.onHealthChanged / onLevelUp
 
-    Keyboard->>Input: keydown 32 → keys.space = true
-    Controller->>State: idle sees space → setState('attack')
+    Keyboard->>Player: keys.space = true
+    Player->>Player: setState(player, 'attack')
     loop every frame of the swing
-        Controller->>Attack: player.action {action: 'attack', time}
+        Player->>Attack: stateTime grows; arm follows the swing curve
     end
-    Note over Attack: time passes 0.7 s
-    Attack->>Grid: findNearby(2)
-    Grid-->>Attack: the monster
-    Note over Attack: is it alive and in front? damage = 50 × 3 = 150
-    Attack->>MonsterHealth: health.damage {value: 150, attacker: player}
-    MonsterHealth->>PlayerHealth: health.add-experience {value: 100}
-    MonsterHealth->>MonsterBrain: health.death → play death animation
-    MonsterHealth->>Bar: health.update {health: 0, maxHealth: 50}
-    Note over State: animation 'finished' → setState('idle')
+    Note over Attack: stateTime passes hitTime (0.4 s)
+    Attack->>Attack: monsters within 7 units and in front?
+    Attack->>Monster: damage 50 × 3 = 150 → health 0 → setState(monster, 'death')
+    Attack->>Player: gainExperience(100) → level 2, stats grow
+    Attack->>World: onLevelUp(player) → sparkles; onHealthChanged → stats on screen
+    Note over Attack: stateTime passes duration (0.8 s) → setState(player, 'idle')
 ```
 
-1. Space sets `keys.space`. `IdleState` switches to `AttackState`, which plays the slash animation once.
-2. Every frame, **`player-entity.js`** `broadcastAction` sends `player.action` with the animation time.
-3. **`attacker-controller.js`** waits for the time to cross 0.7 s, then finds monsters within 2 units that
-   are in front of the knight and sends each `health.damage` with 150 damage.
-4. The monster's **`health-component.js`** drops to 0 → tells the player `health.add-experience`, and
-   broadcasts `health.death` (its **`monster-controller.js`** switches to the death animation) and
-   `health.update` (its **`health-bar.js`** slides to empty and red).
-5. When the slash animation ends, the three.js mixer fires `finished`; `AttackState` goes back to idle.
+- The dead monster tips over (`animate`), its floating health bar slides to empty and disappears
+  (**`overlay.js`**), and it no longer blocks movement (only *living* characters do).
 
-A dead monster's health is 0, so `collides` ignores it (you can walk through the body) and the attack
-code ignores it too.
+## 5.3 A monster attacks you
 
-## 4.3 A monster attacks you
+Every frame, **`monster.js`** `updateMonster`:
 
-The same code, the other way around. Each frame **`monster-controller.js`** `walkTowardPlayer`:
+1. Is the player alive and within 100 units? If not, stand still.
+2. Turn to face the player (`angleTowards`) and walk (`moveCharacter`).
+3. If the next step is blocked — usually by the player, 4 units away — `setState(monster, 'attack')`.
+4. **`character.js`** `updateAttack`: at 0.35 s the bite lands: 2 damage, if the player is within 6 units
+   and in front. `onHealthChanged` shrinks the health bar at the top left.
 
-1. Finds the living `player` within 100 units. If there is none, it stays idle.
-2. Pretends to hold W, turns to face the player and walks.
-3. When the next step would come within 4 units of the player, it pretends to press Space instead.
-4. `IdleState` sees Space → `AttackState` → bite animation → at 0.35 s **`attacker-controller.js`** sends the
-   player 2 damage → the player's health bar at the top left shrinks.
+At 0 health the knight falls over, keys no longer do anything, and the monsters stop chasing.
 
-At 0 health the player gets `health.death` → death animation, and monsters stop chasing (they only chase
-a *living* player).
+## 5.4 You level up
 
-## 4.4 You level up
+1. The first kill gives 100 experience; level 1 needs 100 → level up.
+2. `gainExperience` raises level, strength, wisdomness, benchpress (+1) and curl (+2).
+3. `world.onLevelUp(player)` → **`main.js`** adds 300 particles from **`sparkles.js`** `createSparkles`.
+4. Each frame `updateSparkles` moves and ages them; **`overlay.js`** draws them as glowing circles.
+5. The next level needs 200 points, then 400, and so on.
 
-1. You kill your first monster: +100 experience. Level 1 needs 100 → level up.
-2. **`health-component.js`** raises strength, wisdomness, benchpress (+1) and curl (+2), and updates the
-   statistics panel.
-3. It finds the `level-up-spawner` entity and calls `spawn(player position)`.
-4. **`level-up-component.js`** creates a new entity with a `LevelUpComponent` → 300 particles.
-5. **`particle-system.js`** animates them for up to 3 seconds; when all have died the effect entity
-   turns itself off.
-6. The next level needs 200 more points, then 400, and so on.
+## 5.5 You click the girl
 
-## 4.5 You click the girl
+1. **`input.js`** passes the click position to the function given in **`main.js`**.
+2. That always hides the quest text first (so clicking anywhere else closes it).
+3. `isOnGirl` asks the renderer where her feet and the top of her head are on screen (`renderer.project`),
+   and checks whether the click is inside that rectangle.
+4. If yes: **`user-interface.js`** `giveQuest` adds "Welcome Adventurer!" to the journal (only once) and shows the text.
 
-1. The browser fires `mouseup`. **`player-input.js`** `onMouseUp` hides the quest box, converts the mouse
-   position, and shoots a ray from the camera.
-2. It looks at entities with a `pickable` component and a loaded model — only the girl.
-3. If the ray passes through the box around her model, she gets `input.picked`.
-4. Her **`quest-component.js`** finds the `user-interface` entity and calls `addQuest`.
-5. **`user-interface-controller.js`** adds "Welcome Adventurer!" to the journal (only the first time) and
-   shows the quest text box.
+## 5.6 You drag the axe into an equipment slot
 
-## 4.6 You drag the axe into an equipment slot
-
-1. At the start, **`main.js`** sent `inventory.add` for the axe and the sword, so they are in backpack
-   slots 1 and 2, and `inventory.equip` for the sword, so the knight holds the sword.
-2. You open the inventory (backpack icon) and drag the axe. `ondragstart` remembers `inventory-1`.
-3. You drop it on an equipment slot: `ondrop` → `onItemDropped` swaps the two slots' contents and icons.
-4. Because the target is an equipment slot, `inventory.equip` is broadcast with the axe's name.
-5. **`equip-weapon-component.js`** removes the sword model, loads `Axe.fbx`, and attaches it to the hand bone.
-6. From now on **`attacker-controller.js`** uses the axe's `damage` value.
+1. At start-up **`main.js`** called `inventory.add('Axe')`, `inventory.add('Sword')` and `inventory.equip('Sword')`.
+2. Open the backpack (middle icon) and drag the axe. `ondragstart` remembers which slot it came from.
+3. Drop it on an equipment slot: `swap` exchanges the two slots' contents and icons.
+4. The target is an equipment slot → `onEquip(ITEMS.Axe)` → **`main.js`** `equipWeapon`:
+   `player.weapon` becomes the axe, `Axe.obj` is loaded, and the hand node's children are replaced with it.
+5. The next hit uses the axe's `damage`.

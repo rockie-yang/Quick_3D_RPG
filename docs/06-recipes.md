@@ -3,61 +3,59 @@
 Each recipe says which file to open and what to change. Reload the page after saving.
 
 ### More (or fewer) monsters
-**`src/main.js`**, in `loadPlayer`: change `50` in `for (let index = 0; index < 50; ++index)`.
+**`src/main.js`**: change `50` in `Array.from({ length: 50 }, ...)`.
 
 ### Only ghosts
-**`src/main.js`**: change `const MONSTERS = [...]` to `const MONSTERS = ['Ghost'];`.
+**`src/monster.js`**: `export const MONSTER_TYPES = ['Ghost'];`
+Other monsters available in `resources/monsters/OBJ`: Bat, Bee, Chicken, Crab, Cthulhu, Deer, Demon,
+Mushroom, Panda, Penguin, Pig, Tree, YellowDragon, Yeti, Alien_Tall.
 
 ### A stronger sword
-**`src/main.js`**, in `loadPlayer`: the `weapon(...)` helper gives every weapon `damage: 3`.
-For example give it a third argument and use it: `weapon('Sword', 'pointy-sword-64.png', 10)`.
+**`src/inventory.js`**: in `ITEMS`, change the sword's `damage: 3` to `10`.
+
+### A new weapon
+**`src/inventory.js`**: add `Hammer: { name: 'Hammer', damage: 5, icon: 'war-axe-64.png', model: 'Hammer_Small' },`
+to `ITEMS`, and in **`src/main.js`** add `inventory.add('Hammer');`. Then drag it into an equipment slot.
+(Models are in `resources/weapons/OBJ`.)
 
 ### Tougher monsters
-**`src/main.js`**: in the monster's `HealthComponent({...})` raise `health` and `maxHealth` to e.g. `500`.
-Raise `strength` to make them hit harder.
+**`src/monster.js`**: in `createMonster`, raise `health` and `maxHealth` (e.g. `500`), or `strength` to hit harder.
 
-### Run faster
-**`src/player-entity.js`**: `acceleration = new THREE.Vector3(1, 0.125, 50.0)` — the last number is
-forward speed. `keys.shift ? 2.0 : 1.0` is the running multiplier. The middle number is turning speed.
+### Run faster, turn faster
+**`src/player.js`**: `FORWARD_ACCELERATION` and `TURN_SPEED`.
 
 ### Camera further away
-**`src/third-person-camera.js`**: `pointBehindTarget(0, 10, -15)` is the camera spot (10 up, 15 behind).
-Try `(0, 20, -30)`.
+**`src/camera.js`**: `nearPlayer(-15, 10)` is the camera spot (15 behind, 10 up). Try `nearPlayer(-30, 20)`.
 
 ### Monsters notice you from further away
-**`src/monster-controller.js`**: `findNearby(100)` in `findPlayerDirection`.
+**`src/monster.js`**: `NOTICE_DISTANCE`.
 
 ### Level up faster
-**`src/health-component.js`**: `Math.round(2 ** (parameters.level - 1) * 100)` is the experience needed.
-Change `100` to `10`.
+**`src/character.js`**: in `gainExperience`, change `100 * 2 ** (stats.level - 1)` to `10 * 2 ** (stats.level - 1)`.
 
-### A different quest text
-**`src/quest-component.js`**: change `TITLE` and `TEXT` at the top.
+### A different quest
+**`src/user-interface.js`**: change `QUEST` at the top.
 
-### More trees, denser forest
-**`src/main.js`**, `loadFoliage`: change `100`. In `randomPosition`, `500` is how far from the centre
+### A denser forest
+**`src/scenery.js`**: change `length: 100` for more trees. In `randomPosition`, `500` is how far from the centre
 things are placed — smaller means denser.
 
-### Night time
-**`src/main.js`**: lower the sun's brightness `new THREE.DirectionalLight(0xFFFFFF, 1.0)` to `0.2`,
-and set `topColor` in `loadSky` to a dark blue like `new THREE.Color(0x000022)`.
+### Snowy world
+**`src/scenery.js`**: use the snow trees, e.g. `const TREE_TYPES = ['PineTree_Snow', 'CommonTree_Snow', 'BirchTree_Snow'];`
+and a white ground: `groundGeometry(5000, '#e8eef2')`.
 
-### Add a new component — e.g. a monster that spins
-Create `src/spin-component.js`:
+### Evening light
+**`src/main.js`**: in `LIGHTING`, lower the sun: `sunDirection: { x: -0.9, y: 0.2, z: 0.3 }`, and an orange fog
+`fogColour: [0.95, 0.7, 0.5]`. In **`base.css`** change the `.container` gradient to match.
+
+### A knight in different colours
+**`src/shapes.js`**: `buildKnight` — the colours passed to `buildPerson` (legs, arms, body, head).
+
+### Make the girl wave
+**`src/main.js`**, inside `frame`, before `renderer.render(...)`:
 
 ```js
-// Rotates its entity's model a little every frame.
-export function SpinComponent({turnsPerSecond}) {
-  let entity;
-  return {type: 'spin', init: (owner) => entity = owner, update};
-
-  function update(secondsElapsed) {
-    entity.mesh?.rotateY(turnsPerSecond * 2 * Math.PI * secondsElapsed);
-  }
-}
+girl.parts.rightArm.rotation.z = -2.5 + Math.sin(now / 200) * 0.4;
 ```
 
-Then in **`src/main.js`** import it and add it to the girl:
-`girl.addComponent(SpinComponent({turnsPerSecond: 0.5}));`
-
-That is the whole pattern: a factory function returning `{type, init, update}`.
+(`now` is the time in milliseconds; `rotation.z` swings the arm sideways.)

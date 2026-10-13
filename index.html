@@ -2,6 +2,7 @@
 <html>
 <head>
   <title>The Legend of SimonDev</title>
+  <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
   <link rel="stylesheet" type="text/css" href="base.css">
   <link rel="preconnect" href="https://fonts.gstatic.com">
@@ -9,9 +10,11 @@
   <link href="https://fonts.googleapis.com/css2?family=IM+Fell+French+Canon+SC&display=swap" rel="stylesheet">
 </head>
 <body>
-  <script src="./src/main.js" type="module">
-  </script>
+  <script src="./src/main.js" type="module"></script>
   <div class="container" id="container">
+    <canvas class="game-canvas" id="game-canvas"></canvas>
+    <canvas class="overlay-canvas" id="overlay-canvas"></canvas>
+    <div class="loading" id="loading">Loading…</div>
     <div class="ui">
       <div class="quest-journal-layout">
         <div class="quest-journal" id="quest-journal">
