@@ -22,8 +22,11 @@ const LIGHTING = {
 	fogDensity: 0.002,
 };
 
-// The longest time one frame may advance the game. If the browser tab was hidden for a while,
-// the next frame would otherwise see several seconds pass at once and everything would jump.
+// The most game time one frame may move forward. This does NOT limit the frame rate: frames come as often
+// as the screen refreshes (60, 120, 144 times a second...), and each one moves the game by the real time
+// since the last one. It only matters when a frame comes very LATE: the browser pauses the game while its tab
+// is hidden, and without this limit the first frame afterwards would move everything by minutes at once.
+// (The cost: if a computer is slower than 30 frames a second, the game runs in slow motion instead of jumping.)
 const MAXIMUM_STEP_SECONDS = 1 / 30;
 
 async function startGame() {
@@ -78,6 +81,7 @@ async function startGame() {
 		// The game loop: the browser calls this before every screen refresh, about 60 times a second.
 		// First update the world, then draw it.
 		function frame(now) {
+			// Real time since the previous frame, in seconds — but never more than MAXIMUM_STEP_SECONDS.
 			const secondsElapsed = Math.min(MAXIMUM_STEP_SECONDS, (now - previousTime) / 1000);
 			previousTime = now;
 

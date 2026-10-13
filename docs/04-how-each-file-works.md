@@ -135,7 +135,7 @@ Random numbers (`randomInRange`, `randomInteger`, `pickRandom`), `clamp`, `linea
 in [3.5](03-architecture.md#35-what-happens-every-frame). Also here:
 
 - `LIGHTING` — sun direction, fog colour (matches the sky's horizon colour) and fog thickness.
-- `MAXIMUM_STEP_SECONDS` — no frame may advance the game by more than 1/30 s.
+- `MAXIMUM_STEP_SECONDS` — no single frame may move the game clock forward by more than 1/30 s. This is not a frame-rate limit.
 - `createGirl` — loads the girl and her idle animation, and places her 30 units from the centre.
 - `equipWeapon` — loads the weapon model and attaches it to the knight's `RightHandIndex1` bone, turned
   so the handle sits in the fist.

@@ -87,7 +87,7 @@ HTML user interface or the sparkles. `main.js` decides what happens.
 
 ```mermaid
 flowchart TD
-    Start["browser calls frame()"] --> Time["secondsElapsed = time since last frame<br/>(at most 1/30 s)"]
+    Start["browser calls frame()"] --> Time["secondsElapsed = real time since last frame<br/>(but at most 1/30 s per frame)"]
     Time --> Player["updatePlayer: read keys → state → move / attack → animate"]
     Player --> Monsters["updateMonster × 50: chase → move / bite → animate"]
     Monsters --> Girl["updateAnimator: the girl's idle animation"]

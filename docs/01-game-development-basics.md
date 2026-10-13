@@ -36,9 +36,15 @@ So every update gets the **time since the previous frame**, in seconds — usual
 position.x += speed * secondsElapsed;   // same speed on every computer
 ```
 
-This game also never lets one frame be longer than 1/30 of a second (`MAXIMUM_STEP_SECONDS` in `main.js`).
-Browsers pause `requestAnimationFrame` while the tab is hidden; without the limit, the first frame after
-coming back would see minutes pass at once and everything would jump.
+**There is no limit on frames per second.** The browser calls the loop once per screen refresh — 60, 120,
+144 times a second, whatever the screen can do — and each frame moves the game by the real time since
+the previous one.
+
+There is only a limit on how much game time **one** frame may move forward: 1/30 of a second
+(`MAXIMUM_STEP_SECONDS` in `main.js`). That only matters when a frame comes very *late*: browsers pause
+`requestAnimationFrame` while the tab is hidden, and without the limit the first frame after coming back
+would move everything by minutes at once. (On a computer slower than 30 frames a second, the limit makes
+the game run in slow motion instead of jumping.)
 
 The opposite case — frames coming *very fast* — needs nothing special: the time per frame is then small,
 so everything moves a little per frame and the same amount per second. (See

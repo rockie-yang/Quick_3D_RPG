@@ -84,7 +84,24 @@ surfaces that face it brighter.
 
 ### Where is the 1/30 second cap? Where is the "nothing jumps after the tab was in the background" logic?
 
-They are the same line (see the first question). **Change:** it has a named constant, `MAXIMUM_STEP_SECONDS`.
+They are the same line (see the first question). The old comment called it a "cap", which was misleading:
+
+| | Is it limited? |
+|---|---|
+| **Frames per second** | No. The loop runs once per screen refresh: 60, 120, 144… whatever the screen and computer allow. |
+| **Game time per frame** | Yes: at most 1/30 s. A normal frame is far below that (1/60 = 0.017 s, 1/144 = 0.007 s), so the limit does nothing. |
+
+The limit only kicks in for a frame that comes **late**. Examples:
+
+| Situation | Real time since last frame | `secondsElapsed` |
+|-----------|----------------------------|------------------|
+| 144 Hz screen | 0.007 s | 0.007 s |
+| 60 Hz screen | 0.017 s | 0.017 s |
+| A slow computer, 20 frames a second | 0.05 s | 0.033 s — the game runs a bit slower than real time |
+| Tab was hidden for 2 minutes | 120 s | 0.033 s — nobody teleports |
+
+**Change:** it has a named constant, `MAXIMUM_STEP_SECONDS`, and the comment in `main.js` now says plainly
+that it is not a frame-rate limit. To actually limit the frame rate, see the first question.
 
 ### Does a quaternion include rotation, movement and scale?
 
