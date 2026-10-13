@@ -7,6 +7,7 @@ Every abbreviation and technical word used in the code or these docs, in alphabe
 | **Accessor** | glTF: a description of one list of numbers in the binary part of a .glb file (where it starts, how many, what type). |
 | **Adapter** | WebGPU's name for a graphics card the browser found. |
 | **AI** | Artificial intelligence. In games: code that decides what computer-controlled characters do. Here: walk to the player and bite. |
+| **Alpha** | The fourth number of a pixel besides red, green and blue: how solid it is. 1 = solid, 0 = see-through. |
 | **Async / await** | JavaScript's way of waiting for slow things (like downloading a file) without freezing the page. An `async` function can `await` a result; `Promise.all` waits for many at once. |
 | **Bind group** | WebGPU: a bundle of inputs (buffers, textures) handed to the shader together. |
 | **Bone / skeleton** | The invisible joints inside a character (hips, arm, hand…) that animations move; the skin follows them. See [Basics 1.7](01-game-development-basics.md#17-skeletons-and-animation). |
@@ -40,9 +41,10 @@ Every abbreviation and technical word used in the code or these docs, in alphabe
 | **Key frame** | One moment in an animation clip where a bone's position or rotation is stored; in between, values are blended. |
 | **Material** | The recipe for how a surface looks: base colour, optional texture picture, lit or not. See [2.4](02-how-3d-drawing-works.md#24-material-and-texture). |
 | **Matrix (4 × 4)** | 16 numbers describing a move + turn + resize. See [2.7](02-how-3d-drawing-works.md#27-matrices-move-turn-resize-in-one-package). |
+| **Mipmap** | Smaller copies of a texture (½, ¼, ⅛ … size); far-away surfaces read the copy that fits, so they don't flicker. |
 | **Mesh** | A shape uploaded to the graphics card, ready to draw. |
 | **Node** | Something placed in the world (a mesh, a bone, or a group), with a position, rotation, scale and child nodes. See [2.5](02-how-3d-drawing-works.md#25-nodes-placing-things-in-the-world-and-the-hierarchy). |
-| **Normal** | The direction a surface faces. Used for lighting. |
+| **Normal** | The direction a surface faces. Used for lighting. *Smooth normals*: corners at the same spot share an averaged normal, so low-poly shapes look round. |
 | **NPC** | Non-player character: any character the computer controls (monsters, the girl). |
 | **OBJ** | Wavefront Object: a very simple text 3D file format, without skeletons or animations. Not used by the game. |
 | **Overlay** | The transparent 2D canvas on top of the 3D picture (health bars, sparkles). |
@@ -58,15 +60,18 @@ Every abbreviation and technical word used in the code or these docs, in alphabe
 | **Sampler / sampling** | Reading a texture picture at a (u, v) spot; the sampler decides how (here: blending the 4 nearest pixels). |
 | **Scene graph** | The tree of nodes, where children follow their parents. |
 | **Shader** | A small program that runs on the graphics card. See [2.9](02-how-3d-drawing-works.md#29-shaders-programs-on-the-graphics-card). |
+| **Seamless texture** | A picture whose edges continue each other, so it can be repeated without visible lines. |
 | **Skin / skinning** | A character's visible surface, tied to the skeleton; skinning moves each corner with its bones. See [2.6](02-how-3d-drawing-works.md#26-skinning-how-the-skin-follows-the-bones). |
+| **Sprite / billboard** | A flat picture placed in the 3D world that always faces the camera. The clouds are sprites. |
 | **Spatial grid** | The ground cut into squares, each listing the things on it, to find nearby things quickly. |
 | **sRGB / linear colour** | sRGB: the colour numbers screens and pictures use. Linear: the "physically even" version some files store; converted with a power of 1/2.2. |
 | **State** | What a character is doing now: idle, walk, run, attack, death. |
 | **Texture** | A picture wrapped onto a model's surface; one optional ingredient of a material. |
+| **Tiling / repeat** | Showing the same picture again and again side by side, like floor tiles (the grass). Needs a seamless picture. |
 | **Tint** | A colour the final colour is multiplied by. |
+| **Triplanar mapping** | Placing a picture on a model without texture coordinates by projecting it from three directions (above, front, side). |
 | **Uniform** | A value given to the shader that is the same for many corners/pixels (camera, sun, a node's matrix). |
 | **Unit** | The world's distance measure. Here, roughly 30 cm (the knight is 6 units tall). |
-| **Unlit** | Ignores the sunlight; always fully bright (the clouds). |
 | **UV / texture coordinate** | Two numbers (u across, v down) saying which point of a picture a corner shows. |
 | **Vertex / vertices** | A corner of a triangle / several corners. |
 | **Vertex shader** | Part of the shader that runs once per corner to place it on screen. |

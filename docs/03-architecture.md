@@ -74,7 +74,7 @@ HTML user interface or the sparkles. `main.js` decides what happens.
 1. `createRenderer` — connect to the graphics card (WebGPU). If that fails, the reason is shown on the page.
 2. Create the user interface, the 2D overlay and the camera.
 3. **Load everything at once** and wait for all of it: the knight and his 5 animations, the girl,
-   the scenery (ground, 100 trees, 20 clouds) and 50 random monsters. Loading is `async`: each file is
+   the scenery (ground and 100 trees), the clouds and 50 random monsters. Loading is `async`: each file is
    requested, and `await Promise.all(...)` waits until every one has arrived. Files used many times
    (the same tree, the same monster) are loaded only once; each character gets its own copy of the
    node tree so it can be posed on its own.
@@ -91,10 +91,12 @@ flowchart TD
     Time --> Player["updatePlayer: read keys → state → move / attack → animate"]
     Player --> Monsters["updateMonster × 50: chase → move / bite → animate"]
     Monsters --> Girl["updateAnimator: the girl's idle animation"]
-    Girl --> Sparkles["updateSparkles: move, fade, remove finished ones"]
+    Girl --> Clouds["sky.update: clouds drift with the wind"]
+    Clouds --> Sparkles["updateSparkles: move, fade, remove finished ones"]
     Sparkles --> Camera["updateCamera: glide behind the player"]
     Camera --> Render["renderer.render: draw the 3D world (WebGPU)"]
-    Render --> Overlay["overlay.draw: health bars + sparkles (2D canvas)"]
+    Render --> SkyDraw["sky.draw: clouds (2D canvas behind)"]
+    SkyDraw --> Overlay["overlay.draw: health bars + sparkles (2D canvas)"]
     Overlay --> Next["requestAnimationFrame(frame)"]
 ```
 
@@ -103,9 +105,10 @@ flowchart TD
 `index.html` stacks, from back to front:
 
 1. The **sky**: just the page background, a blue-to-white gradient (`.container` in `base.css`).
-2. `#game-canvas`: the 3D picture (WebGPU). Cleared to transparent, so the sky shows where nothing is drawn.
-3. `#overlay-canvas`: a normal 2D canvas for health bars and sparkles. It ignores the mouse (`pointer-events: none`).
-4. The HTML user interface: health bar, icons, inventory, statistics, quests.
+2. `#sky-canvas`: the clouds, soft pictures drawn by `sky.js` (2D canvas).
+3. `#game-canvas`: the 3D picture (WebGPU). Cleared to transparent, so the sky shows where nothing is drawn.
+4. `#overlay-canvas`: a normal 2D canvas for health bars and sparkles. It ignores the mouse (`pointer-events: none`).
+5. The HTML user interface: health bar, icons, inventory, statistics, quests.
 
 The page is exactly one screen: `overflow: hidden` on `html` and `body`, so there are no scrollbars.
 
@@ -126,6 +129,7 @@ flowchart LR
     Main --> Inventory["inventory.js"]
     Main --> UserInterface["user-interface.js"]
     Main --> Overlay["overlay.js"] --> Sparkles["sparkles.js"]
+    Main --> Sky["sky.js"]
     Scenery --> Shapes["shapes.js"]
     Character --> Shapes
     GltfLoader --> Renderer
@@ -136,4 +140,4 @@ Three layers:
 
 - **Drawing** — `renderer.js`, `matrix.js`, `shapes.js`, `gltf-loader.js`, `animation.js`: know nothing about the game.
 - **Game rules** — `character.js`, `player.js`, `monster.js`, `spatial-grid.js`, `sparkles.js`, `camera.js`: know nothing about HTML.
-- **Page** — `main.js`, `input.js`, `inventory.js`, `user-interface.js`, `overlay.js`: connect the two to the web page.
+- **Page** — `main.js`, `input.js`, `inventory.js`, `user-interface.js`, `overlay.js`, `sky.js`: connect the two to the web page.

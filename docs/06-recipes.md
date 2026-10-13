@@ -46,6 +46,10 @@ things are placed — smaller means denser.
 2. **`src/scenery.js`**: `const TREE_TYPES = ['PineTree_Snow', 'CommonTree_Snow', 'BirchTree_Snow'];`
    and a white ground: `tint: hexToColour('#e8eef2')`.
 
+### More, bigger or faster clouds
+**`src/main.js`**: `createSky()` takes the number of clouds, e.g. `createSky(60)`. In **`src/sky.js`**: `width` is
+the size range and `WIND_SPEED` the drift.
+
 ### Evening light
 **`src/main.js`**: in `LIGHTING`, lower the sun: `sunDirection: { x: -0.9, y: 0.2, z: 0.3 }`, and an orange fog
 `fogColour: [0.95, 0.7, 0.5]`. In **`base.css`** change the `.container` gradient to match.

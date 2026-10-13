@@ -7,6 +7,7 @@ import { createInventory } from './inventory.js';
 import { createUserInterface } from './user-interface.js';
 import { createOverlay } from './overlay.js';
 import { createScenery, randomPosition } from './scenery.js';
+import { createSky } from './sky.js';
 import { createPlayer, updatePlayer } from './player.js';
 import { createMonster, updateMonster, MONSTER_TYPES } from './monster.js';
 import { createSparkles, updateSparkles } from './sparkles.js';
@@ -37,11 +38,12 @@ async function startGame() {
 		const overlay = createOverlay();
 		const camera = createCamera();
 
-		// Load the player, the girl, the scenery and 50 random monsters, all at the same time.
-		const [player, girl, scenery, monsters] = await Promise.all([
+		// Load the player, the girl, the scenery, the clouds and 50 random monsters, all at the same time.
+		const [player, girl, scenery, sky, monsters] = await Promise.all([
 			createPlayer(renderer),
 			createGirl(renderer),
 			createScenery(renderer),
+			createSky(),
 			Promise.all(Array.from({ length: 50 }, () => createMonster(renderer, pickRandom(MONSTER_TYPES), randomPosition()))),
 		]);
 
@@ -90,11 +92,13 @@ async function startGame() {
 				updateMonster(monster, world, secondsElapsed);
 			}
 			updateAnimator(girl.animator, secondsElapsed);
+			sky.update(secondsElapsed);
 			world.sparkles = updateSparkles(world.sparkles, secondsElapsed);
 			updateCamera(camera, player, secondsElapsed);
 
 			const nodes = [...scenery.nodes, girl.root, player.root, ...monsters.map(monster => monster.root)];
 			renderer.render(nodes, camera, LIGHTING);
+			sky.draw(renderer.project);
 			overlay.draw(world, renderer.project, secondsElapsed);
 			requestAnimationFrame(frame);
 		}

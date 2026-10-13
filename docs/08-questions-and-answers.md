@@ -5,6 +5,22 @@ Several led to changes, noted under **Change**.
 
 ---
 
+### Were the clouds and trees simplified? They look stiff.
+
+No: the clouds, trees and flat green ground were the same in the original — low-poly art, where every
+triangle has one flat colour. That style is what looked stiff.
+
+**Change:** a few small pictures and two classic tricks, with almost no extra work for the graphics card:
+
+- **Ground:** a small seamless grass picture, repeated every 12 units, with mipmaps so it doesn't flicker
+  in the distance.
+- **Trees:** small grey bark and leaf pictures multiplied with each piece's own colour, placed by
+  triplanar mapping (the models have no texture coordinates), plus smooth normals so leaves look round.
+- **Clouds:** replaced by soft cloud pictures (sprites) drawn behind the 3D picture. A solid low-poly
+  cloud still looked like a lump even with a texture; a soft see-through picture looks like a cloud.
+
+All explained in [2.4](02-how-3d-drawing-works.md#24-material-and-texture).
+
 ### Should the game loop skip a frame when `requestAnimationFrame` comes too fast?
 
 No. `requestAnimationFrame` is not a timer that can "run too fast": the browser calls it once per screen

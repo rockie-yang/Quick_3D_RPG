@@ -15,14 +15,16 @@ import { createNode } from './renderer.js';
 
 const cache = new Map();   // file path -> the loaded file, so each file is loaded only once
 
-export function loadGltf(renderer, path) {
-	if (!cache.has(path)) {
-		cache.set(path, loadAndParse(renderer, path));
+// `smoothNormals: true` makes faceted models look round and soft (see smoothNormals below).
+export function loadGltf(renderer, path, { smoothNormals = false } = {}) {
+	const key = path + (smoothNormals ? ' (smooth)' : '');
+	if (!cache.has(key)) {
+		cache.set(key, loadAndParse(renderer, path, smoothNormals));
 	}
-	return cache.get(path);
+	return cache.get(key);
 }
 
-async function loadAndParse(renderer, path) {
+async function loadAndParse(renderer, path, smooth) {
 	const response = await fetch(path);
 	if (!response.ok) {
 		throw new Error(`Could not load ${path}`);
@@ -43,6 +45,7 @@ async function loadAndParse(renderer, path) {
 	const materials = (json.materials ?? []).map((material) => {
 		const { baseColorFactor = [1, 1, 1, 1], baseColorTexture } = material.pbrMetallicRoughness ?? {};
 		return {
+			name: material.name ?? '',
 			// Colours in glTF are "linear"; the power 1/2.2 turns them into normal screen colours.
 			colour: baseColorFactor.slice(0, 3).map(value => Math.pow(value, 1 / 2.2)),
 			texture: baseColorTexture ? textures[baseColorTexture.index] : null,
@@ -51,8 +54,8 @@ async function loadAndParse(renderer, path) {
 
 	// Meshes: each mesh has one or more "primitives" (a set of triangles with one material).
 	const meshes = (json.meshes ?? []).map((mesh) => mesh.primitives.map((primitive) => ({
-		mesh: renderer.createMesh(primitiveGeometry(primitive, read)),
-		material: materials[primitive.material] ?? { colour: [1, 1, 1], texture: null },
+		mesh: renderer.createMesh(smooth ? smoothNormals(primitiveGeometry(primitive, read)) : primitiveGeometry(primitive, read)),
+		material: materials[primitive.material] ?? { name: '', colour: [1, 1, 1], texture: null },
 	})));
 
 	// Skins: which nodes are the bones, and each bone's "inverse bind matrix" (see renderer.js).
@@ -148,6 +151,31 @@ function primitiveGeometry(primitive, read) {
 	return geometry;
 }
 
+// Low-poly models give every corner of a triangle the triangle's own normal, so each triangle is lit
+// evenly and its edges show sharply ("faceted"). Here, corners at the same spot share one normal: the
+// average of all the triangles that meet there. Light then changes smoothly across the surface, and
+// round things like clouds and leaves look round.
+function smoothNormals(geometry) {
+	const { positions, normals } = geometry;
+	const keyAt = (corner) => positions.slice(corner * 3, corner * 3 + 3).map(value => value.toFixed(3)).join(',');
+	const sums = new Map();   // position -> sum of the normals of every corner at that position
+	for (let corner = 0; corner < positions.length / 3; corner++) {
+		const sum = sums.get(keyAt(corner)) ?? [0, 0, 0];
+		for (let axis = 0; axis < 3; axis++) {
+			sum[axis] += normals[corner * 3 + axis];
+		}
+		sums.set(keyAt(corner), sum);
+	}
+	for (let corner = 0; corner < positions.length / 3; corner++) {
+		const sum = sums.get(keyAt(corner));
+		const length = Math.hypot(...sum) || 1;
+		for (let axis = 0; axis < 3; axis++) {
+			normals[corner * 3 + axis] = sum[axis] / length;
+		}
+	}
+	return geometry;
+}
+
 // Make a fresh copy of the model's node tree, ready to be placed in the world and animated.
 // Returns { root, nodesByName, clips }.
 export function createModel(file) {
@@ -173,6 +201,7 @@ export function createModel(file) {
 			for (const { mesh, material } of meshes[description.mesh]) {
 				node.children.push(createNode({
 					mesh,
+					material: material.name,   // e.g. 'Wood' or 'Green', so the game can give it a texture
 					texture: material.texture,
 					tint: material.colour,
 					skin: skin && { joints: skin.joints.map(joint => nodes[joint]), inverseBindMatrices: skin.inverseBindMatrices },

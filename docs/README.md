@@ -53,8 +53,10 @@ Quick_3D_RPG/
 ├── index.html      The web page: two canvases (3D picture + 2D overlay) and the menus
 ├── base.css        How the page looks, including the sky gradient
 ├── resources/      Art made by other artists: 3D models, animations, textures, icons
-│   └── models/     The models the game loads (.glb), converted from the artists' .fbx files
-├── tools/          convert-models.sh: makes resources/models/ from the .fbx files
+│   ├── models/     The models the game loads (.glb), converted from the artists' .fbx files
+│   └── textures/   Small seamless textures for grass, bark, leaves and clouds
+├── tools/          convert-models.sh: makes resources/models/ from the .fbx files;
+│                   make-textures.py: makes the small textures
 ├── src/            All the game code — this is what the docs explain
 └── docs/           You are here
 ```

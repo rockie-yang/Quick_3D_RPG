@@ -4,8 +4,8 @@ A tour of every file in `src/`, grouped by layer (see [Architecture 3.7](03-arch
 
 - **Drawing:** [`renderer.js`](#rendererjs--draws-3d-with-webgpu), [`matrix.js`](#matrixjs--move-turn-resize), [`gltf-loader.js`](#gltf-loaderjs--reads-glb-model-files), [`animation.js`](#animationjs--plays-and-blends-animation-clips), [`shapes.js`](#shapesjs--the-ground-and-shadows)
 - **Game rules:** [`character.js`](#characterjs--what-player-and-monsters-share), [`player.js`](#playerjs--the-knight), [`monster.js`](#monsterjs--the-monsters), [`spatial-grid.js`](#spatial-gridjs--what-is-near-this-spot), [`camera.js`](#camerajs--the-follow-camera), [`sparkles.js`](#sparklesjs--the-level-up-effect), [`math.js`](#mathjs--small-helpers)
-- **Page:** [`main.js`](#mainjs--start-up-and-the-game-loop), [`scenery.js`](#sceneryjs--ground-trees-clouds), [`input.js`](#inputjs--keyboard-and-mouse), [`inventory.js`](#inventoryjs--the-backpack), [`user-interface.js`](#user-interfacejs--panels-and-quests), [`overlay.js`](#overlayjs--health-bars-and-sparkles-on-top)
-- **Tool:** [`tools/convert-models.sh`](#toolsconvert-modelssh--fbx-to-glb)
+- **Page:** [`main.js`](#mainjs--start-up-and-the-game-loop), [`scenery.js`](#sceneryjs--ground-and-trees), [`sky.js`](#skyjs--the-clouds), [`input.js`](#inputjs--keyboard-and-mouse), [`inventory.js`](#inventoryjs--the-backpack), [`user-interface.js`](#user-interfacejs--panels-and-quests), [`overlay.js`](#overlayjs--health-bars-and-sparkles-on-top)
+- **Tools:** [`tools/make-textures.py`](#toolsmake-texturespy--the-small-textures), [`tools/convert-models.sh`](#toolsconvert-modelssh--fbx-to-glb)
 
 ---
 
@@ -141,11 +141,20 @@ in [3.5](03-architecture.md#35-what-happens-every-frame). Also here:
   so the handle sits in the fist.
 - `isOnGirl` — checks whether a click landed on the girl, using her projected feet and head.
 
-### `scenery.js` — ground, trees, clouds
+### `scenery.js` — ground and trees
 
-`createScenery` makes the ground, 100 random trees (7 kinds × 5 variants, random spot and rotation) and
-20 clouds (unlit, so they stay white), loading all files at once. Returns the nodes to draw and the trees
-as obstacles. `randomPosition` picks a spot within 500 units of the centre.
+`createScenery` loads the four small textures, then makes the grassy ground (the grass picture repeated
+every 12 units), 100 random trees (7 kinds × 5 variants, random spot and rotation, with bark or leaf
+textures by triplanar mapping and smooth normals), loading all files at once. Returns the nodes to draw and the trees as obstacles. `randomPosition` picks a
+spot within 500 units of the centre.
+
+### `sky.js` — the clouds
+
+`createSky()` (async) loads `cloud.png` and places 25 clouds at random spots 90–140 units up.
+`update` moves them slowly with the wind (wrapping round at the edge of the world). `draw` paints them on
+the 2D canvas behind the 3D picture: for each cloud it projects its centre, top and bottom to the screen to
+find where and how big to draw the picture, fades far ones out, and draws far clouds first.
+See [Sprites](02-how-3d-drawing-works.md#sprites-the-clouds).
 
 ### `input.js` — keyboard and mouse
 
@@ -175,7 +184,13 @@ A transparent 2D canvas over the 3D one. Each frame it is cleared (by resizing i
 
 ---
 
-## Tool
+## Tools
+
+### `tools/make-textures.py` — the small textures
+
+Makes `grass.png`, `bark.png` and `leaves.png` (256 × 256, seamless) in `resources/textures/` from random
+noise, blurred into blobs or streaks, and `cloud.png` (a soft cloud with see-through edges) from overlapping
+round puffs. Already done; run it again only to change them.
 
 ### `tools/convert-models.sh` — FBX to GLB
 

@@ -26,7 +26,8 @@ struct Frame {
 struct Draw {
 	model: mat4x4f,            // where the model is, how it is turned and sized
 	tint: vec4f,               // the material colour; multiplied with the texture picture
-	settings: vec4f,           // x: 1 = ignore lighting (always bright)
+	settings: vec4f,           // x: texture scale. 0 = use the model's own texture coordinates;
+	                           //    above 0 = "triplanar": take them from the world position (see below)
 };
 
 @group(0) @binding(0) var<uniform> frame: Frame;
@@ -68,15 +69,31 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
 	return output;
 }
 
+// Triplanar mapping, for models that have no texture coordinates (trees, clouds).
+// Imagine three projectors shining the picture onto the model: one from above, one from the front and
+// one from the side, each using the world position as texture coordinates. Each surface mostly gets the
+// projector it faces, blended by its normal, so the picture never looks stretched.
+fn triplanar(worldPosition: vec3f, normal: vec3f, scale: f32) -> vec3f {
+	let position = worldPosition * scale;
+	var weights = pow(abs(normalize(normal)), vec3f(4.0));
+	weights = weights / (weights.x + weights.y + weights.z);
+	let fromSide = textureSample(colourTexture, colourSampler, position.zy).rgb;
+	let fromAbove = textureSample(colourTexture, colourSampler, position.xz).rgb;
+	let fromFront = textureSample(colourTexture, colourSampler, position.xy).rgb;
+	return fromSide * weights.x + fromAbove * weights.y + fromFront * weights.z;
+}
+
 @fragment
 fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
 	// The material: the colour of the texture picture at this point, times the material colour.
 	// (Models without a picture use a plain white one, so only the material colour remains.)
-	var colour = textureSample(colourTexture, colourSampler, input.textureCoordinate).rgb * draw.tint.rgb;
+	let fromModel = textureSample(colourTexture, colourSampler, input.textureCoordinate).rgb;
+	let fromWorld = triplanar(input.worldPosition, input.normal, draw.settings.x);
+	var colour = select(fromModel, fromWorld, draw.settings.x > 0.0) * draw.tint.rgb;
 
 	// Lighting: surfaces facing the sun are brighter. 0.55 is the "ambient" light that reaches everywhere.
 	let sunLight = max(dot(normalize(input.normal), frame.sunDirection.xyz), 0.0);
-	colour = select(colour * (0.55 + 0.6 * sunLight), colour, draw.settings.x > 0.5);
+	colour = colour * (0.55 + 0.6 * sunLight);
 
 	// Fog: the further away, the more the colour fades into the fog colour.
 	let distance = length(input.worldPosition - frame.cameraPosition.xyz);
@@ -134,7 +151,13 @@ export async function createRenderer(canvas) {
 		layout: pipeline.getBindGroupLayout(0),
 		entries: [{ binding: 0, resource: { buffer: frameBuffer } }],
 	});
-	const sampler = device.createSampler({ magFilter: 'linear', minFilter: 'linear', addressModeU: 'repeat', addressModeV: 'repeat' });
+	// How pictures are read: blend nearby pixels ('linear'), repeat the picture past its edges ('repeat'),
+	// use the smaller copies of the picture for far-away surfaces ('mipmapFilter', see createTextureFromImage),
+	// and stay sharp on surfaces seen at a slant, like the ground ('maxAnisotropy').
+	const sampler = device.createSampler({
+		magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear', maxAnisotropy: 8,
+		addressModeU: 'repeat', addressModeV: 'repeat',
+	});
 	// A 1 × 1 white picture, used by models that have no texture.
 	const whiteTexture = createTextureFromPixels(new Uint8Array([255, 255, 255, 255]), 1, 1);
 	// A single "do nothing" bone matrix, used by models without a skeleton.
@@ -181,14 +204,25 @@ export async function createRenderer(canvas) {
 	}
 
 	// Put a picture (from a file, or from inside a model file) onto the graphics card.
+	//
+	// Together with the picture we store "mipmaps": copies at half the size, a quarter, an eighth, ... down to
+	// 1 × 1 pixel. Far away, a whole 256-pixel grass picture may cover only a few screen pixels; reading the
+	// full picture there would pick random pixels and shimmer. The graphics card picks the copy whose size
+	// fits instead, which looks calm and smooth.
 	async function createTextureFromImage(blob) {
 		const bitmap = await createImageBitmap(blob);
+		const levels = Math.floor(Math.log2(Math.max(bitmap.width, bitmap.height))) + 1;
 		const texture = device.createTexture({
 			size: [bitmap.width, bitmap.height],
+			mipLevelCount: levels,
 			format: 'rgba8unorm',
 			usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
 		});
-		device.queue.copyExternalImageToTexture({ source: bitmap }, { texture }, [bitmap.width, bitmap.height]);
+		for (let level = 0; level < levels; level++) {
+			const width = Math.max(1, bitmap.width >> level), height = Math.max(1, bitmap.height >> level);
+			const copy = await createImageBitmap(bitmap, { resizeWidth: width, resizeHeight: height, resizeQuality: 'high' });
+			device.queue.copyExternalImageToTexture({ source: copy }, { texture, mipLevel: level }, [width, height]);
+		}
 		return texture;
 	}
 
@@ -261,7 +295,7 @@ export async function createRenderer(canvas) {
 		// position, so its own model matrix does nothing.
 		drawData.set(node.skin ? identity() : node.worldMatrix, 0);
 		drawData.set([...node.tint, 1], 16);
-		drawData.set([node.unlit ? 1 : 0, 0, 0, 0], 20);
+		drawData.set([node.textureScale, 0, 0, 0], 20);
 		device.queue.writeBuffer(resources.uniformBuffer, 0, drawData);
 		if (node.skin) {
 			device.queue.writeBuffer(resources.boneBuffer, 0, skinMatrices(node.skin));
@@ -333,11 +367,13 @@ export async function createRenderer(canvas) {
 //   rotation  { x, y, z } angles in radians — or `quaternion` [x, y, z, w] (model files use those)
 //   scale     one number, or { x, y, z } to stretch differently in each direction
 //   tint      the material colour [red, green, blue], each 0 to 1; texture: an optional picture
+//   textureScale  0 = place the picture with the model's texture coordinates; above 0 = triplanar mapping,
+//             repeating the picture every 1 / textureScale world units (for models without texture coordinates)
 //   skin      for characters: the bones that move this mesh (see gltf-loader.js)
 export function createNode({ name = '', mesh = null, texture = null, position = {}, rotation = {}, quaternion = null,
-	scale = 1, tint = [1, 1, 1], unlit = false, skin = null, children = [] } = {}) {
+	scale = 1, tint = [1, 1, 1], textureScale = 0, material = '', skin = null, children = [] } = {}) {
 	return {
-		name, mesh, texture, tint, unlit, skin, children, quaternion,
+		name, mesh, texture, tint, textureScale, material, skin, children, quaternion,
 		visible: true,
 		position: { x: 0, y: 0, z: 0, ...position },
 		rotation: { x: 0, y: 0, z: 0, ...rotation },

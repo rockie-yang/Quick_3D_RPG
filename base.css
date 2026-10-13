@@ -17,8 +17,8 @@ html, body {
   background: linear-gradient(#5f9ee8 0%, #a9cdf2 40%, #dde9f5 55%);
 }
 
-/* The 3D picture, and the 2D canvas on top of it for health bars and sparkles. */
-.game-canvas, .overlay-canvas {
+/* From back to front: the clouds (2D), the 3D picture, and the 2D canvas for health bars and sparkles. */
+.sky-canvas, .game-canvas, .overlay-canvas {
   position: absolute;
   top: 0;
   left: 0;
@@ -27,8 +27,8 @@ html, body {
   display: block;
 }
 
-/* Clicks go through the overlay to the 3D canvas underneath. */
-.overlay-canvas {
+/* Clicks go through the 2D canvases. */
+.sky-canvas, .overlay-canvas {
   pointer-events: none;
 }
 

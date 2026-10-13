@@ -105,16 +105,19 @@ bumps, a glow colour, transparency… This game uses only the essentials. For ea
 |------------------|---------------------|---------|
 | **base colour** | `baseColorFactor` in the .glb file | `node.tint` |
 | **base colour texture** (optional) | `baseColorTexture` in the .glb file, or a separate .png | `node.texture` |
-| **unlit** (optional) | set by the game for clouds | `node.unlit` |
+| **texture scale** (optional) | set by the game for models without texture coordinates | `node.textureScale` (see "Triplanar mapping" below) |
 
 And the recipe, in the fragment shader (`renderer.js`), for one pixel:
 
 ```wgsl
-// 1. the picture's colour at this pixel's (u, v) — models without a picture use a plain white one
+// 1. the picture's colour at this pixel — at the model's (u, v), or by triplanar mapping;
+//    models without a picture use a plain white one
+let fromModel = textureSample(colourTexture, colourSampler, input.textureCoordinate).rgb;
+let fromWorld = triplanar(input.worldPosition, input.normal, draw.settings.x);
 // 2. times the material's base colour
-var colour = textureSample(colourTexture, colourSampler, input.textureCoordinate).rgb * draw.tint.rgb;
-// 3. times the sunlight (unless the material is unlit)
-colour = select(colour * (0.55 + 0.6 * sunLight), colour, draw.settings.x > 0.5);
+var colour = select(fromModel, fromWorld, draw.settings.x > 0.0) * draw.tint.rgb;
+// 3. times the sunlight
+colour = colour * (0.55 + 0.6 * sunLight);
 // 4. faded into the fog with distance
 return vec4f(mix(colour, frame.fog.rgb, fogAmount), 1.0);
 ```
@@ -122,17 +125,81 @@ return vec4f(mix(colour, frame.fog.rgb, fogAmount), 1.0);
 Multiplying by white (1, 1, 1) changes nothing, which is why "no picture" uses a white picture and
 "no colour" uses a white colour: then the same recipe works for every model.
 
-### The four kinds of models in this game
+### The kinds of models in this game
 
 | Model | Texture | Material colour | Result |
 |-------|---------|-----------------|--------|
-| Knight, girl | a picture stored **inside** the .glb file | white | the picture, lit by the sun |
-| Monsters | a picture in a **separate** .png (`resources/monsters/Textures/`), given to the model by `monster.js` | white | the picture, lit by the sun |
-| Trees, weapons | none | one colour **per piece**: a tree has a "Wood" piece and a "Green" piece | plain colours, lit by the sun |
-| Clouds | none | white × 1.2, **unlit** | bright white, not shaded |
+| Knight, girl | a picture stored **inside** the .glb file | white | the picture |
+| Monsters | a picture in a **separate** .png (`resources/monsters/Textures/`), given to the model by `monster.js` | white | the picture |
+| Ground | `grass.png`, a small **coloured** picture repeated every 12 units | white | the grass picture |
+| Trees | `bark.png` or `leaves.png`, small **grey** pictures, by triplanar mapping | one colour **per piece**: "Wood", "Green", … | the piece's colour with streaks or clumps |
+| Weapons | none | one colour per piece ("LightSteel", "DarkWood", …) | plain colours |
 
-A model with several materials is split into several meshes, one per material (glTF calls them
-**primitives**). The tree is two meshes: the brown trunk and the green leaves.
+Everything is lit by the sun. A model with several materials is split into several meshes, one per
+material (glTF calls them **primitives**). A tree is two meshes: the trunk and the leaves.
+
+A **grey** texture multiplied with a colour keeps the colour but adds a pattern: white parts leave the
+colour as it is, darker parts darken it. That is how one `leaves.png` serves every tree: green leaves
+stay green, dark green leaves stay dark green, all with the same clumpy pattern.
+
+The three small pictures (256 × 256 pixels each) are made by `tools/make-textures.py`:
+
+| grass.png | bark.png | leaves.png |
+|-----------|----------|------------|
+| <img src="../resources/textures/grass.png" width="128"> | <img src="../resources/textures/bark.png" width="128"> | <img src="../resources/textures/leaves.png" width="128"> |
+
+They are **seamless**: the right edge continues the left edge and the bottom continues the top, so
+they can be repeated without visible lines. The grass picture has only small details on purpose: a big
+light patch in it would appear again every 12 units, in a grid across the whole ground.
+
+### Repeating a picture
+
+The ground is 5 000 units wide; one picture stretched over all of it would be a blur. Instead its
+texture coordinates go from 0 to about 400 (`groundGeometry(5000, 12)`: one picture every 12 units), and
+the sampler is set to `repeat`: u = 3.25 shows the same spot as u = 0.25. The picture is tiled like floor tiles.
+
+### Triplanar mapping: a picture on a model without texture coordinates
+
+The tree models were made as plain coloured shapes, so their corners have no (u, v).
+**Triplanar mapping** invents them from the position in the world. Imagine three slide projectors shining the
+same picture onto the model: one from above (using x and z as u and v), one from the front (x and y), one
+from the side (z and y). Each surface takes mostly the picture of the projector it faces — the top of a
+leaf clump from the one above, a trunk from the side ones — blended by its normal, so the picture never
+looks smeared. `node.textureScale` sets how big the picture is: 0.3 means it repeats every 1 / 0.3 ≈ 3 units.
+(`triplanar` in the shader in `renderer.js`.)
+
+It costs three picture reads per pixel instead of one, which is little for a graphics card.
+
+### Mipmaps: calm pictures in the distance
+
+Far away, a whole 256-pixel picture may shrink to a few pixels on screen. Reading single pixels of the full
+picture there gives a random, flickering result. So with each picture we store **mipmaps**: copies at half
+the size, a quarter, an eighth… down to 1 × 1, each one smoothly shrunk. The graphics card reads the copy
+that fits the size on screen (`createTextureFromImage` in `renderer.js`; sampler setting `mipmapFilter`).
+The sampler's `maxAnisotropy` additionally keeps surfaces seen at a slant, like the ground, sharp.
+
+### Smooth normals: round instead of faceted
+
+The models are "low poly": few, large triangles. If every triangle has its own normal, each is lit evenly
+and the edges show sharply. For trees the loader instead gives corners that share a spot the
+**average** normal of all their triangles (`smoothNormals` in `gltf-loader.js`). The light then changes
+gradually across the surface, and the leaves look round and soft.
+
+### Sprites: the clouds
+
+Clouds have no hard surface, so a solid 3D model of a cloud — even a smoothed and textured one — still
+looks like a lump. Instead each cloud is a **sprite** (also called a *billboard*): a flat, soft,
+see-through picture placed at a spot high in the world and always facing the camera.
+
+<img src="../resources/textures/cloud.png" width="256" alt="The cloud picture">
+
+`cloud.png` has a fourth number per pixel besides red, green and blue: **alpha**, how solid the pixel is.
+The edges fade from solid to fully see-through, so the cloud blends softly into the sky.
+
+`src/sky.js` draws the clouds on a separate 2D canvas *behind* the 3D picture. Each frame it asks
+`renderer.project` where a cloud's centre, top and bottom are on screen, which gives its position and
+how big it looks from this distance, and draws the picture there. Far clouds fade out the same way
+fog works. Because the sky canvas is behind the 3D canvas, trees and characters always cover the clouds.
 
 ### How it reaches the graphics card
 
@@ -155,7 +222,7 @@ A mesh describes a shape around its own centre. To place it in the world we put 
 | `rotation` or `quaternion` | which way it is turned (see 2.7) |
 | `scale` | how big: 3 means three times as big |
 | `children` | nodes attached to this one |
-| `texture`, `tint`, `unlit` | the material (2.4) |
+| `texture`, `tint`, `textureScale` | the material (2.4) |
 | `skin` | for characters: the bones that move this mesh (2.6) |
 
 Because nodes have children, they form a **tree** (often called the **scene graph**). A child moves,
@@ -331,5 +398,6 @@ sequenceDiagram
     Game->>Overlay: draw health bars and sparkles on top
 ```
 
-The sky is not drawn by the renderer at all: the canvas is cleared to *transparent*, and the blue
-gradient is the page's background behind it (`.container` in `base.css`).
+The sky is not drawn by the renderer at all: the canvas is cleared to *transparent*, and behind it are
+the clouds (`sky.js`, on their own 2D canvas) and the blue gradient of the page's background
+(`.container` in `base.css`).
