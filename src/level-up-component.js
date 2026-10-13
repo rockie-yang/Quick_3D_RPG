@@ -4,35 +4,45 @@ import {ParticleSystem} from './particle-system.js';
 import {Entity} from './entity.js';
 
 
-export function LevelUpComponentSpawner(params) {
+// Lives on the 'level-up-spawner' helper entity; creates a short-lived sparkle effect entity on level up.
+// `parameters` holds the three.js camera and scene the particles need.
+export function LevelUpComponentSpawner(parameters) {
   let entity;
-  return {type: 'spawner', init: (e) => entity = e, spawn};
+  return {type: 'levelUpSpawner', init: (owner) => entity = owner, spawn};
 
-  function spawn(pos) {
-    const e = Entity();
-    e.setPosition(pos);
-    e.addComponent(LevelUpComponent(params));
-    entity.parent.add(e);
-    return e;
+  // Create a brand-new entity at `position` that shows the effect, and register it with the manager.
+  function spawn(position) {
+    const effect = Entity();
+    effect.setPosition(position);
+    effect.addComponent(LevelUpComponent(parameters));
+    entity.parent.add(effect);
+    return effect;
   }
 }
 
+// 300 particles burst out, fade green to red, then the entity switches itself off.
 export function LevelUpComponent({camera, scene}) {
   let entity;
   const particles = ParticleSystem({camera, parent: scene, texture: './resources/textures/ball.png'});
-  [[0, 0], [0.1, 1], [0.7, 1], [1, 0]].forEach(p => particles.alphaSpline.addPoint(...p));
+
+  // Curves over each particle's life, as [age, value] pairs (age 0 = just born, 1 = about to die).
+  // Alpha (opacity): fade in fast, stay solid, fade out at the end.
+  [[0, 0], [0.1, 1], [0.7, 1], [1, 0]].forEach(point => particles.alphaSpline.addPoint(...point));
+  // Colour: green, then lighter green, then red.
   [[0, 0x00FF00], [0.5, 0x40C040], [1, 0xFF4040]].forEach(
-      ([t, c]) => particles.colourSpline.addPoint(t, new THREE.Color(c)));
-  [[0, 0.05], [0.5, 0.25], [1, 0]].forEach(p => particles.sizeSpline.addPoint(...p));
+      ([time, colour]) => particles.colourSpline.addPoint(time, new THREE.Color(colour)));
+  // Size: grow, then shrink to nothing.
+  [[0, 0.05], [0.5, 0.25], [1, 0]].forEach(point => particles.sizeSpline.addPoint(...point));
   return {type: 'levelUp', init, update};
 
-  function init(e) {
-    entity = e;
-    particles.addParticles(e.position, 300);
+  function init(owner) {
+    entity = owner;
+    particles.addParticles(owner.position, 300);
   }
 
-  function update(timeElapsed) {
-    particles.step(timeElapsed);
+  function update(secondsElapsed) {
+    particles.step(secondsElapsed);
+    // When every particle has died, stop updating this entity.
     if (particles.isEmpty()) {
       entity.setActive(false);
     }
