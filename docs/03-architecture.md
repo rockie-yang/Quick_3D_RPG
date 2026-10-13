@@ -78,6 +78,7 @@ monster.addComponent(HealthComponent({health: 50, maxHealth: 50, /* ... */}));
 monster.getComponent('health').isAlive();   // true
 ```
 
+<!-- the components concept is over engineered. have a finite predefined component is way simpler, monster.getComponent('health').isAlive(); => monster.health.isAlive, as the game anyway need to know it's health component-->
 (The function definitions after `return` still work, because JavaScript "hoists" function declarations —
 they exist from the start of the function.)
 

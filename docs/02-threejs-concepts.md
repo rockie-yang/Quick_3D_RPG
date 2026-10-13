@@ -46,6 +46,7 @@ the world". Every `Object3D` has:
 | `visible`, `castShadow`, `receiveShadow` | Drawing switches. |
 | `matrixWorld` | The final, combined position/rotation/scale in the world (calculated by three.js). |
 
+<!-- TODO quaternion  include the rotation, move, scale, of of it, right? -->
 These kinds of objects are all `Object3D`s, so they can all go into the tree:
 
 ```mermaid
@@ -154,6 +155,9 @@ Useful material settings seen in the code: `map` (the texture), `side` (`DoubleS
 `BackSide` = only the inside — used for the sky sphere), `transparent`, `blending`, `depthTest` /
 `depthWrite` (whether it hides / is hidden by things in front).
 
+<!-- TODO explain what's difference between FBXLoader, GLTFLoader, is it just because the case for this came the model is loaded this way, or this is conventions or standard-->
+
+<!-- TODO is it material just type of texture, or there is another layer from texture then material or reverse? explain it -->
 ### Texture — a picture on the surface
 
 `new THREE.TextureLoader().load('file.png')` gives a **`Texture`**. Put it in `material.map`.
@@ -250,5 +254,6 @@ sequenceDiagram
     Note over Entities,Three: the changes show up in the next render
 ```
 
+<!-- Why render first then update? -->
 The game code never draws anything itself. It only **changes properties of three.js objects**
 (positions, rotations, animation times, colours) and three.js draws the result on the next frame.
